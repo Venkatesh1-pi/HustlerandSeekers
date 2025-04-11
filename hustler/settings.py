@@ -108,7 +108,7 @@ DEBUG = False
 
 # ALLOWED_HOSTS = ['https://hustlersandseekers.co/','hustlersandseekers.co', 'https://staging.hustlersandseekers.co/', 'staging.hustlersandseekers.co']
 
-ALLOWED_HOSTS = ['82.25.86.49']
+ALLOWED_HOSTS = ['*']
 
 
 
