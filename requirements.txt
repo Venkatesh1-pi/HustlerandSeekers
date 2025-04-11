@@ -21,3 +21,10 @@ typing_extensions==4.9.0
 tzdata==2023.3
 urllib3==2.1.0
 xmltodict==0.14.2
+djangorestframework
+django 
+xmltodict
+numpy
+geopy
+Pillow
+requests
