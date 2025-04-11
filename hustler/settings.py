@@ -98,7 +98,7 @@ SECRET_KEY = 'django-insecure-js@cra0$&f@h$7!pp*8i=-k&t=i)k_14+a4-5-5qi2ath1nkd-
 
 
 
-DEBUG = True
+DEBUG = False
 
 
 
@@ -108,7 +108,7 @@ DEBUG = True
 
 # ALLOWED_HOSTS = ['https://hustlersandseekers.co/','hustlersandseekers.co', 'https://staging.hustlersandseekers.co/', 'staging.hustlersandseekers.co']
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['82.25.86.49']
 
 
 
