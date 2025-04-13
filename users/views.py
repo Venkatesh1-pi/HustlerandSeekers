@@ -67,38 +67,58 @@ def user_exists(username, current_user):
     return Users.objects.exclude(id=current_user.id).filter(username=username).exists()
 
 
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth import authenticate
+from django.core.exceptions import ObjectDoesNotExist
+from rest_framework.authtoken.models import Token
+from django.db.models import Q
+from .models import Users  # Adjust if needed
+
 @api_view(['POST'])
 def user_login(request):
     if request.method == 'POST':
-        username = request.data.get('username')
+        username = request.data.get('username')  # Can be email, username, or mobile
         password = request.data.get('password')
-        
+        device_token = request.data.get('device_token', '')
+        latitude = request.data.get('latitude', '')
+        longitude = request.data.get('longitude', '')
+
         user = None
+
+        # Try login by email
         if '@' in username:
             try:
                 user = Users.objects.get(email=username)
+                if not user.check_password(password):
+                    return Response({"error": {"error_code": 400, "error": "Invalid credentials"}}, status=status.HTTP_401_UNAUTHORIZED)
             except ObjectDoesNotExist:
-                pass
+                user = None
 
+        # Fallback to Django authentication
         if not user:
             user = authenticate(username=username, password=password)
 
         if user:
-            
-            user_obj = Users.objects.filter(Q(email=username)|Q(username=username))[0]
-            user_obj.device_token = request.data.get('device_token')
-            user_obj.latitude = request.data.get('latitude')
-            user_obj.longitude = request.data.get('longitude')
-            user_obj.save()
+            # Update device token and location
+            user_obj = Users.objects.filter(Q(email=username) | Q(username=username)).first()
+            if user_obj:
+                user_obj.device_token = device_token
+                user_obj.latitude = latitude
+                user_obj.longitude = longitude
+                user_obj.save()
+
+            # Reset token
             Token.objects.filter(user=user).delete()
             token = Token.objects.create(user=user)
 
-            
-            profile = Users.objects.filter(Q(email=username)|Q(username=username)).values('id','username','email').first()
-            
-            return Response({'token': token.key, 'data':profile}, status=status.HTTP_200_OK)
+            # Keep the response data as you originally had
+            profile = Users.objects.filter(Q(email=username) | Q(username=username)).values('id', 'username', 'email').first()
 
-        return Response({"error":{"error_code": 400,"error": "Invalid credentials"}}, status=status.HTTP_401_UNAUTHORIZED)   
+            return Response({'token': token.key, 'data': profile}, status=status.HTTP_200_OK)
+
+        return Response({"error": {"error_code": 400, "error": "Invalid credentials"}}, status=status.HTTP_401_UNAUTHORIZED)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

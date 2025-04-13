@@ -10,4 +10,5 @@ urlpatterns = [
     path('Show_User_Profile/', Show_User_Profile, name='Show_User_Profile'),
     path('Update_Profile/', Update_Profile, name='Update_Profile'),
     path('Forgot_Password/', Forgot_Password, name='Forgot_Password'),
+    
 ]
