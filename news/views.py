@@ -25,21 +25,42 @@ def fetch_google_news_rss(search_query, city, area):
 
 
 
+import xmltodict
+from bs4 import BeautifulSoup
 
 def parse_news_data(news):
     data_dict = xmltodict.parse(news.content)
     news_items = data_dict['rss']['channel']['item']
     news_list = []
+
     for item in news_items:
         title = item['title']
         link = item['link']
         pub_date = item['pubDate']
+        
+        # Extract description
+        description = item.get('description', '')
+        
+        # Check if description is HTML and convert to plain text if so
+        if description:
+            soup = BeautifulSoup(description, "html.parser")
+            description_text = soup.get_text()  # Extract plain text from HTML
+        else:
+            description_text = description
+
+        # Extract source (if available)
+        source = item.get('source', '')
+
         news_list.append({
             'title': title,
             'link': link,
-            'pubDate': pub_date
+            'pubDate': pub_date,
+            'description': description_text,
+            'source': source
         })
+
     return news_list
+
 
 # Function to reverse geocode and get city and area
 def reverse_geocode(api_key, lat, lng):
@@ -151,3 +172,20 @@ def get_news_data(request):
     news_data = [item for sublist in results for item in sublist]
 
     return JsonResponse({'news': news_data}, status=200)
+
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+
+@api_view(['GET'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_news_categories(request):
+    categories = [
+        {'id': 1, 'category': 'finance'},
+        {'id': 2, 'category': 'business'}
+    ]
+    return Response({'categories': categories}, status=status.HTTP_200_OK)
+
