@@ -26,8 +26,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UpdateUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = Users
-        fields = ['id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude']
-
+        fields = ['id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude', 'radius_km']
 
     def update(self, instance, validated_data):
         try:
@@ -39,12 +38,14 @@ class UpdateUserSerializer(serializers.ModelSerializer):
             instance.banner_image = validated_data.get('banner_image', instance.banner_image)
             instance.gender = validated_data.get('gender', instance.gender)
             instance.dob = validated_data.get('dob', instance.dob)
+            instance.first_name = validated_data.get('first_name', instance.first_name)  # Corrected line
+            instance.last_name = validated_data.get('last_name', instance.last_name)  # Corrected line
             instance.location = validated_data.get('location', instance.location)
             instance.latitude = validated_data.get('latitude', instance.latitude)
             instance.longitude = validated_data.get('longitude', instance.longitude)
+            instance.radius_km = validated_data.get('radius_km', instance.radius_km)  # Update the radius_km field
 
             # Save the instance to persist the changes
-
             instance.save()
 
         except IntegrityError as e:
@@ -54,7 +55,9 @@ class UpdateUserSerializer(serializers.ModelSerializer):
             else:
                 raise e
 
-        return instance         
+        return instance
+
+
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(required=True)

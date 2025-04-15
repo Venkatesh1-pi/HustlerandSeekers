@@ -24,6 +24,9 @@ from django.contrib.auth import update_session_auth_hash
 from .serializers import ChangePasswordSerializer
 from django.db import IntegrityError
 from django.contrib import messages
+from rest_framework.authentication import TokenAuthentication
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 
 @api_view(['POST'])
 def register_user(request):
@@ -45,22 +48,40 @@ def register_user(request):
 
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
 @csrf_exempt
 def Update_Profile(request):
-    if request.method == 'POST':
-        user_instance = request.user
-        serializer = UpdateUserSerializer(instance=user_instance, data=request.data)
+    user_instance = request.user
 
-        if serializer.is_valid():
-            # Check if the new username already exists
-            new_username = serializer.validated_data.get('username')
-            if new_username and user_exists(new_username, user_instance):
-                return Response({"error": {"error_code": 400, "error": {"username": ["A user with that username already exists."]}}}, status=status.HTTP_400_BAD_REQUEST)
+    serializer = UpdateUserSerializer(instance=user_instance, data=request.data, partial=True)
+    
+    if serializer.is_valid():
+        new_username = serializer.validated_data.get('username')
+        if new_username and user_exists(new_username, user_instance):
+            return Response({
+                "error": {
+                    "error_code": 400,
+                    "error": {
+                        "username": ["A user with that username already exists."]
+                    }
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-            serializer.save()
-            return Response({"success": {"code": 200, "base_url": 'https://hustlersandseekers.co/hustler/media/', "data": serializer.data}}, status=status.HTTP_200_OK)
+        serializer.save()
+        return Response({
+            "success": {
+                "code": 200,
+                "base_url": 'https://hustlersandseekers.co/hustler/media/',
+                "data": serializer.data
+            }
+        }, status=status.HTTP_200_OK)
 
-        return Response({"error": {"error_code": 400, "error": serializer.errors}}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({
+        "error": {
+            "error_code": 400,
+            "error": serializer.errors
+        }
+    }, status=status.HTTP_400_BAD_REQUEST)
 
 def user_exists(username, current_user):
     # Check if any other user has the same username
@@ -114,7 +135,7 @@ def user_login(request):
             token = Token.objects.create(user=user)
 
             # Keep the response data as you originally had
-            profile = Users.objects.filter(Q(email=username) | Q(username=username)).values('id', 'username', 'email').first()
+            profile = Users.objects.filter(Q(email=username) | Q(username=username)).values('id', 'username', 'email','radius_km').first()
 
             return Response({'token': token.key, 'data': profile}, status=status.HTTP_200_OK)
 
@@ -146,16 +167,18 @@ def change_password(request):
                 return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
             return Response({'error': 'Incorrect old password.'}, status=status.HTTP_400_BAD_REQUEST)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)      
-   
+
+ 
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
 @csrf_exempt
 def Show_User_Profile(request):
     try:
         data = request.data
         
         if Users.objects.filter(id = data.get('user_id'),is_staff = False).exists():
-            profile = Users.objects.filter(id = data.get('user_id')).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
+            profile = Users.objects.filter(id = data.get('user_id')).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude','radius_km')
             return Response({'status':200,'msg':'User Profile.', 'base_url': 'https://hustlersandseekers.co/hustler/media/','payload':profile[0]})
         else:
             return Response({'status':403,'msg':'Invalid User.'})

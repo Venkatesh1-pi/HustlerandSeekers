@@ -4,7 +4,7 @@ from django.contrib.auth.models import AbstractUser
 
 class Users(AbstractUser):
     user_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
-    
+
     username = models.CharField(max_length=100, unique=True)
     email = models.CharField(max_length=100, null=True, blank=True)
     is_hustler = models.CharField(max_length=100, null=True, blank=True)
@@ -20,4 +20,6 @@ class Users(AbstractUser):
     longitude = models.CharField(max_length=255, null=True, blank=True)
     reset_code = models.CharField(max_length=255, null=True, blank=True)
     device_token = models.CharField(max_length=255, null=True, blank=True)
+    radius_km = models.FloatField(default=25)  # 👈 New field added
     created_at = models.DateTimeField(auto_now_add=True)
+
