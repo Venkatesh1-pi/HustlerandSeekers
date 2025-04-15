@@ -134,8 +134,24 @@ from django.http import JsonResponse
 import concurrent.futures
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-@csrf_exempt
 
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+import concurrent.futures
+import math
+
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from django.http import JsonResponse
+import math
+import concurrent.futures
+
+# Store all news globally (or use cache/db for production)
+all_news_data = []
+
+@csrf_exempt
 @api_view(['POST'])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
@@ -149,11 +165,14 @@ def get_news_data(request):
     lat = body.get('latitude', '')
     lng = body.get('longitude', '')
     radius_km = body.get('radius_km', 25)
+    page = int(body.get('page', 1))
+    page_size = 10  # Fixed page size
 
     print(f"Search query: {search_query}")
 
     if not lat or not lng:
         lat, lng = get_current_location(api_key)
+        print(lat, lng)
         if not lat or not lng:
             return JsonResponse({'error': 'Could not retrieve current location'}, status=400)
 
@@ -171,7 +190,55 @@ def get_news_data(request):
 
     news_data = [item for sublist in results for item in sublist]
 
-    return JsonResponse({'news': news_data}, status=200)
+    # Assign unique ID to each news item
+    for idx, item in enumerate(news_data):
+        item['id'] = idx
+
+    # Save all for lookup in detail view
+    global all_news_data
+    all_news_data = news_data
+
+    # Pagination
+    total_items = len(news_data)
+    total_pages = math.ceil(total_items / page_size)
+
+    start_index = (page - 1) * page_size
+    end_index = start_index + page_size
+    paginated_data = news_data[start_index:end_index]
+
+    return JsonResponse({
+        'news': paginated_data,
+        'total_items': total_items,
+        'total_pages': total_pages,
+        'current_page': page
+    }, status=200)
+
+@csrf_exempt
+@api_view(['POST'])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+def get_single_news_detail(request):
+    """
+    Request Body: { "id": 2 }
+    Response: Single news item with the same fields
+    """
+    news_id = request.data.get("id")
+
+    if news_id is None:
+        return JsonResponse({"error": "Missing 'id' in request body"}, status=400)
+
+    try:
+        news_id = int(news_id)
+    except ValueError:
+        return JsonResponse({"error": "Invalid 'id', must be an integer"}, status=400)
+    print(news_id)
+    global all_news_data
+
+    print(all_news_data)
+
+    return JsonResponse({"news": all_news_data[news_id]}, status=200)
+    
+
 
 
 from rest_framework.decorators import api_view, permission_classes
