@@ -169,6 +169,17 @@ def change_password(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)      
 
  
+
+
+import base64
+import os
+from django.core.files.base import ContentFile
+from django.conf import settings
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
+
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
@@ -177,14 +188,65 @@ def Show_User_Profile(request):
     try:
         data = request.data
         
-        if Users.objects.filter(id = data.get('user_id'),is_staff = False).exists():
-            profile = Users.objects.filter(id = data.get('user_id')).values('id', 'username','name' ,'email', 'phone', 'image', 'gender', 'dob', 'location', 'banner_image', 'latitude', 'longitude','radius_km')
-            return Response({'status':200,'msg':'User Profile.', 'base_url': 'https://hustlersandseekers.co/hustler/media/','payload':profile[0]})
-        else:
-            return Response({'status':403,'msg':'Invalid User.'})
-    except:
-        return Response({'status':403,'msg':'Something went wrong.'})  
+        # Check if user exists
+        if Users.objects.filter(id=data.get('user_id'), is_staff=False).exists():
+            user = Users.objects.get(id=data.get('user_id'))
+            
+            # Function to decode and save base64 image
+            def save_base64_image(base64_data, image_name):
+                # Remove 'data:image/jpeg;base64,' or similar prefix
+                if base64_data.startswith('data:image'):
+                    base64_data = base64_data.split(';base64,')[-1]
+                
+                # Decode the base64 string
+                image_data = base64.b64decode(base64_data)
+                image_path = os.path.join(settings.MEDIA_ROOT, 'user_images', image_name)
+                
+                # Ensure the directory exists
+                if not os.path.exists(os.path.dirname(image_path)):
+                    os.makedirs(os.path.dirname(image_path))
+                
+                # Write the image data to a file
+                with open(image_path, 'wb') as f:
+                    f.write(image_data)
+                
+                return os.path.join(settings.MEDIA_URL, 'user_images', image_name)
+            
+            # Process the images if they exist
+            if user.image:
+                image_url = save_base64_image(user.image, f'{user.id}_profile_image.jpg')
+            else:
+                image_url = None
+            
+            if user.banner_image:
+                banner_url = save_base64_image(user.banner_image, f'{user.id}_banner_image.jpg')
+            else:
+                banner_url = None
+            
+            profile = {
+                'id': user.id,
+                'username': user.username,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'image': image_url,
+                'gender': user.gender,
+                'dob': user.dob,
+                'location': user.location,
+                'banner_image': banner_url,
+                'latitude': user.latitude,
+                'longitude': user.longitude,
+                'radius_km': user.radius_km
+            }
+            
+            return Response({'status': 200, 'msg': 'User Profile.', 'base_url': 'https://hustlersandseekers.co/hustler/media/', 'payload': profile})
         
+        else:
+            return Response({'status': 403, 'msg': 'Invalid User.'})
+    except Exception as e:
+        print(str(e))  # Log the error if needed
+        return Response({'status': 403, 'msg': 'Something went wrong.'})
+
        
 @api_view(['POST'])
 @csrf_exempt
