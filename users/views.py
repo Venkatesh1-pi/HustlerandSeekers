@@ -178,7 +178,7 @@ def Show_User_Profile(request):
         data = request.data
         
         if Users.objects.filter(id = data.get('user_id'),is_staff = False).exists():
-            profile = Users.objects.filter(id = data.get('user_id')).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude','radius_km')
+            profile = Users.objects.filter(id = data.get('user_id')).values('id', 'username','name' ,'email', 'phone', 'image', 'gender', 'dob', 'location', 'banner_image', 'latitude', 'longitude','radius_km')
             return Response({'status':200,'msg':'User Profile.', 'base_url': 'https://hustlersandseekers.co/hustler/media/','payload':profile[0]})
         else:
             return Response({'status':403,'msg':'Invalid User.'})
