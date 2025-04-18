@@ -179,7 +179,10 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
-
+from rest_framework.response import Response
+import base64
+import os
+from django.conf import settings
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
@@ -187,42 +190,36 @@ from rest_framework.authentication import TokenAuthentication
 def Show_User_Profile(request):
     try:
         data = request.data
-        
+        base_url = 'http://82.25.86.49'  # Ideally from settings or dynamically detected
+
         # Check if user exists
         if Users.objects.filter(id=data.get('user_id'), is_staff=False).exists():
             user = Users.objects.get(id=data.get('user_id'))
-            
+
             # Function to decode and save base64 image
             def save_base64_image(base64_data, image_name):
-                # Remove 'data:image/jpeg;base64,' or similar prefix
                 if base64_data.startswith('data:image'):
                     base64_data = base64_data.split(';base64,')[-1]
-                
-                # Decode the base64 string
+
                 image_data = base64.b64decode(base64_data)
                 image_path = os.path.join(settings.MEDIA_ROOT, 'user_images', image_name)
-                
-                # Ensure the directory exists
-                if not os.path.exists(os.path.dirname(image_path)):
-                    os.makedirs(os.path.dirname(image_path))
-                
-                # Write the image data to a file
+
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(image_path), exist_ok=True)
+
                 with open(image_path, 'wb') as f:
                     f.write(image_data)
-                
-                return os.path.join(settings.MEDIA_URL, 'user_images', image_name)
-            
-            # Process the images if they exist
-            if user.image:
-                image_url = save_base64_image(user.image, f'{user.id}_profile_image.jpg')
-            else:
-                image_url = None
-            
-            if user.banner_image:
-                banner_url = save_base64_image(user.banner_image, f'{user.id}_banner_image.jpg')
-            else:
-                banner_url = None
-            
+
+                # Return relative path for MEDIA_URL use
+                return f'user_images/{image_name}'
+
+            # Process images and generate full URLs
+            image_path = save_base64_image(user.image, f'{user.id}_profile_image.jpg') if user.image else None
+            banner_path = save_base64_image(user.banner_image, f'{user.id}_banner_image.jpg') if user.banner_image else None
+
+            image_url = f'{base_url}{settings.MEDIA_URL}{image_path}' if image_path else None
+            banner_url = f'{base_url}{settings.MEDIA_URL}{banner_path}' if banner_path else None
+
             profile = {
                 'id': user.id,
                 'username': user.username,
@@ -238,14 +235,14 @@ def Show_User_Profile(request):
                 'longitude': user.longitude,
                 'radius_km': user.radius_km
             }
-            
-            return Response({'status': 200, 'msg': 'User Profile.', 'base_url': 'https://hustlersandseekers.co/hustler/media/', 'payload': profile})
-        
+
+            return Response({'status': 200, 'msg': 'User Profile.', 'base_url': base_url, 'payload': profile})
         else:
             return Response({'status': 403, 'msg': 'Invalid User.'})
     except Exception as e:
-        print(str(e))  # Log the error if needed
+        print(str(e))
         return Response({'status': 403, 'msg': 'Something went wrong.'})
+
 
        
 @api_view(['POST'])
