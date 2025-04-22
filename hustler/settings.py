@@ -202,6 +202,7 @@ INSTALLED_APPS = [
     # 'fcm_django',
    
     'news',
+    'hustler_role_category',
 
 ]
 

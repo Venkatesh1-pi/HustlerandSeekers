@@ -190,7 +190,7 @@ from django.conf import settings
 def Show_User_Profile(request):
     try:
         data = request.data
-        base_url = 'http://82.25.86.49'  # Ideally from settings or dynamically detected
+        base_url = 'http://127.0.0.1:8000'  # Ideally from settings or dynamically detected
 
         # Check if user exists
         if Users.objects.filter(id=data.get('user_id'), is_staff=False).exists():
