@@ -42,35 +42,38 @@ class UpdateUsersCategorySerializer(serializers.ModelSerializer):
         model = UsersCategory
         fields = [
             'id', 'user_id', 'about_yourself',
-            'image1', 'image2', 'image3', 'video', 'is_primary'
+            'image1', 'image2', 'image3', 'video',
+            'is_primary', 'location', 'latitude', 'longitude'
         ]
 
     def update(self, instance, validated_data):
-        # Update 'about_yourself'
+        # Update text fields
         instance.about_yourself = validated_data.get('about_yourself', instance.about_yourself)
+        instance.is_primary = validated_data.get('is_primary', instance.is_primary)
+        instance.location = validated_data.get('location', instance.location)
+        instance.latitude = validated_data.get('latitude', instance.latitude)
+        instance.longitude = validated_data.get('longitude', instance.longitude)
 
         # Decode and update base64 images (image1, image2, image3)
         for field in ['image1', 'image2', 'image3']:
             image_data = validated_data.get(field, None)
             if image_data:
                 if image_data.startswith("data:image"):
-                    image_data = image_data.split(",")[1]
-                instance.field = base64.b64encode(base64.b64decode(image_data)).decode('utf-8')
+                    image_data = image_data.split(",")[1]  # Remove base64 prefix
+                setattr(instance, field, image_data)
+                print(f"{field} image saved")
 
         # Decode and update base64 video
         video_data = validated_data.get('video', None)
         if video_data:
             if video_data.startswith("data:video"):
-                video_data = video_data.split(",")[1]  # Remove the base64 prefix
-            # Store the base64-encoded video directly (no need to re-encode)
-            instance.video = base64.b64encode(base64.b64decode(video_data)).decode('utf-8')
+                video_data = video_data.split(",")[1]  # Remove base64 prefix
+            instance.video = video_data
 
-        # Update the 'is_primary' field
-        instance.is_primary = validated_data.get('is_primary', instance.is_primary)
-
-        # Save the instance with updated values
         instance.save()
         return instance
+
+
 
 
 

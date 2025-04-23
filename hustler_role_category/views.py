@@ -66,18 +66,36 @@ def haversine(lat1, lon1, lat2, lon2):
     distance_miles = radius_of_earth_miles * c
 
     return round(distance_miles, 2)
-
+from rest_framework import status
+from rest_framework.response import Response
+from .serializers import UsersCategorySerializer
+from .models import UsersCategory  # Assuming the model is named Category
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
 @csrf_exempt
+
+
 def create_category(request):
     if request.method == 'POST':
+        # Assuming 'category_name' is a unique field in the Category model
+        category_name = request.data.get('role_category_name')  # Change to the correct field name
+        
+        # Check if the category already exists
+        if UsersCategory.objects.filter(role_category_name=category_name).exists():
+            return Response({"error": {"error_code": 409, "error": "Category already exists"}}, 
+                            status=status.HTTP_409_CONFLICT)
+        
+        # If the category does not exist, create a new one
         serializer = UsersCategorySerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response({"success": {"code": 200,  "data": serializer.data}}, status=status.HTTP_200_OK)
-        return Response({"error":{"error_code": 400,"error": serializer.errors}}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"success": {"code": 200, "data": serializer.data}}, 
+                            status=status.HTTP_200_OK)
+        
+        return Response({"error": {"error_code": 400, "error": serializer.errors}}, 
+                        status=status.HTTP_400_BAD_REQUEST)
+
 import base64
 import os
 from django.conf import settings
@@ -88,10 +106,11 @@ from django.conf import settings
 def update_category(request):
     base_url = 'http://127.0.0.1:8000'
     user_id = request.data.get('user_id')  # Use 'user_id' for consistency
+    category_name=request.data.get('role_category_name')
     print(f"User ID: {user_id}")  # Debugging
 
     try:
-        category_instance = UsersCategory.objects.get(user_id=user_id)
+        category_instance = UsersCategory.objects.filter(user_id=user_id, role_category_name=category_name).first()
     except UsersCategory.DoesNotExist:
         return Response({
             "error": {
@@ -103,7 +122,7 @@ def update_category(request):
     print(category_instance)
 
     serializer = UpdateUsersCategorySerializer(instance=category_instance, data=request.data)
-
+   
     if serializer.is_valid():
         serializer.save()
 
@@ -144,10 +163,10 @@ def update_category(request):
             # Return the relative path for MEDIA_URL use
             return f'hustler_videos/{video_name}'
 
-        image1 = save_base64_image(category_instance.image1, f'{user_id}_image1.jpg') if category_instance.image1 else None 
-        image2 = save_base64_image(category_instance.image2, f'{user_id}_image2.jpg') if category_instance.image2 else None
-        image3 = save_base64_image(category_instance.image3, f'{user_id}_image3.jpg') if category_instance.image3 else None  
-        video = save_base64_video(category_instance.video, f'{user_id}_video.mp4') if category_instance.video else None
+        image1 = save_base64_image(category_instance.image1, f'{user_id}_{category_name}_image1.jpg') if category_instance.image1 else None 
+        image2 = save_base64_image(category_instance.image2, f'{user_id}_{category_name}_image2.jpg') if category_instance.image2 else None
+        image3 = save_base64_image(category_instance.image3, f'{user_id}_{category_name}_image3.jpg') if category_instance.image3 else None  
+        video = save_base64_video(category_instance.video, f'{user_id}_{category_name}_video.mp4') if category_instance.video else None
 
         image1_url = f'{base_url}{settings.MEDIA_URL}{image1}' if image1 else None
         image2_url = f'{base_url}{settings.MEDIA_URL}{image2}' if image2 else None
@@ -161,16 +180,20 @@ def update_category(request):
             "image2": image2_url,
             "image3": image3_url,
             "video": video_url,
+            "location": category_instance.location,
+            "latitude": category_instance.latitude,
+            "longitude": category_instance.longitude,
             "is_primary": category_instance.is_primary
         }
 
         return Response({
             "success": {
                 "code": 200,
-                "base_url":base_url,
+                "base_url": base_url,
                 "data": media_data
             }
         }, status=status.HTTP_200_OK)
+
 
     return Response({
         "error": {
@@ -234,24 +257,25 @@ from users.models import Users
 @permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
 @csrf_exempt
-def Show_role_category(request):
+def role_category(request):
     data = request.data
     user_id = data.get('user_id')
     print(user_id)
     user=Users.objects.get(id=user_id)
     
-    print(user.name)
-    # Get the user category instance
-    category_instance = UsersCategory.objects.filter(user_id=user_id).first()
+    category_name=request.data.get('role_category_name')
+    
+    category_instance = UsersCategory.objects.filter(user_id=user_id, role_category_name=category_name).first()
+  
 
     if not category_instance:
         return Response({'status': 404, 'msg': 'User role category not found.'}, status=404)
 
     # Process base64 images and videos
-    image1 = save_base64_image(category_instance.image1, f'{user_id}_image1.jpg') if category_instance.image1 else None
-    image2 = save_base64_image(category_instance.image2, f'{user_id}_image2.jpg') if category_instance.image2 else None
-    image3 = save_base64_image(category_instance.image3, f'{user_id}_image3.jpg') if category_instance.image3 else None
-    video = save_base64_video(category_instance.video, f'{user_id}_video.mp4') if category_instance.video else None
+    image1 = save_base64_image(category_instance.image1, f'{user_id}_{category_name}_image1.jpg') if category_instance.image1 else None 
+    image2 = save_base64_image(category_instance.image2, f'{user_id}_{category_name}_image2.jpg') if category_instance.image2 else None
+    image3 = save_base64_image(category_instance.image3, f'{user_id}_{category_name}_image3.jpg') if category_instance.image3 else None  
+    video = save_base64_video(category_instance.video, f'{user_id}_{category_name}_video.mp4') if category_instance.video else None
 
     # Construct URLs for the media files
     image1_url = f'{base_url}{settings.MEDIA_URL}{image1}' if image1 else None
@@ -269,6 +293,9 @@ def Show_role_category(request):
         'image2': image2_url,
         'image3': image3_url,
         'video': video_url,
+         "location": category_instance.location,
+            "latitude": category_instance.latitude,
+            "longitude": category_instance.longitude,
         'is_primary': category_instance.is_primary
     }
 
@@ -283,6 +310,25 @@ def Show_role_category(request):
         'payload': profile,
        
     })
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def Show_role_category(request):
+    user_id = request.data.get('user_id')
+
+    if not user_id:
+        return Response({'status': 400, 'msg': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Get only distinct role_category_names for the specific user
+    user_categories = UsersCategory.objects.filter(user_id=user_id).values_list('role_category_name', flat=True).distinct()
+
+    return Response({
+        'status': 200,
+        'msg': 'Distinct role categories for the user.',
+        'user_id': user_id,
+        'role_categories': list(user_categories)
+    }, status=status.HTTP_200_OK)
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
