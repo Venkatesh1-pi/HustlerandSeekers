@@ -1,10 +1,11 @@
 from django.urls import path
-from .views import create_category,Show_role_category,update_category
-#delete_category, messages_list, messages, send_message, get_distance, add_post, Show_role_category, send_notification, get_hustler_slots, booking_appointment, all_appointments, add_review, hustler_links, update_connect_status, notifications, top_reviews, update_category, top_profiles, mini_resume, add_to_wallet, connect, top_videos
+from .views import create_category,update_category,role_category,Show_role_category
+#delete_category, ,Show_role_category,messages_list, messages, send_message, get_distance, add_post, Show_role_category, send_notification, get_hustler_slots, booking_appointment, all_appointments, add_review, hustler_links, update_connect_status, notifications, top_reviews, update_category, top_profiles, mini_resume, add_to_wallet, connect, top_videos
 
 urlpatterns = [
     path('store/', create_category, name='create_category'),
     path('Show_role_category/', Show_role_category, name='Show_role_category'),
+    path('role_category/', role_category, name='role_category'),
     path('update_category/', update_category, name='update_category'),
     # path('top_profiles/', top_profiles, name='top_profiles'),
     # path('mini_resume/', mini_resume, name='mini_resume'),
