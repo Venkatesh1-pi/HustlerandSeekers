@@ -61,6 +61,7 @@ class Base64VideoField(models.TextField):
         return super().clean(value, model_instance)
 
 class UsersCategory(models.Model):
+    id = models.AutoField(primary_key=True)
     user_id = models.CharField(max_length=100, null=True, blank=True)
     role_category_name = models.CharField(max_length=100, null=True, blank=True)
     summary = models.CharField(max_length=500, null=True, blank=True)

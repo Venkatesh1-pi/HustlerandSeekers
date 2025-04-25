@@ -253,6 +253,13 @@ def save_base64_video(base64_data, video_name):
     # Return the relative path for MEDIA_URL use
     return f'hustler_videos/{video_name}'
 from users.models import Users
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.response import Response
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
@@ -260,54 +267,60 @@ from users.models import Users
 def role_category(request):
     data = request.data
     user_id = data.get('user_id')
-    print(user_id)
-    user=Users.objects.get(id=user_id)
-    
-    category_name=request.data.get('role_category_name')
-    
-    category_instance = UsersCategory.objects.filter(user_id=user_id, role_category_name=category_name).first()
-  
 
-    if not category_instance:
+    try:
+        user = Users.objects.get(id=user_id)
+    except Users.DoesNotExist:
+        return Response({'status': 404, 'msg': 'User not found.'}, status=404)
+
+    category_instances = UsersCategory.objects.filter(user_id=user_id)
+
+    if not category_instances.exists():
         return Response({'status': 404, 'msg': 'User role category not found.'}, status=404)
 
-    # Process base64 images and videos
-    image1 = save_base64_image(category_instance.image1, f'{user_id}_{category_name}_image1.jpg') if category_instance.image1 else None 
-    image2 = save_base64_image(category_instance.image2, f'{user_id}_{category_name}_image2.jpg') if category_instance.image2 else None
-    image3 = save_base64_image(category_instance.image3, f'{user_id}_{category_name}_image3.jpg') if category_instance.image3 else None  
-    video = save_base64_video(category_instance.video, f'{user_id}_{category_name}_video.mp4') if category_instance.video else None
+    base_url = request.build_absolute_uri('/')  # Dynamic base URL from request
+    profiles = []
 
-    # Construct URLs for the media files
-    image1_url = f'{base_url}{settings.MEDIA_URL}{image1}' if image1 else None
-    image2_url = f'{base_url}{settings.MEDIA_URL}{image2}' if image2 else None
-    image3_url = f'{base_url}{settings.MEDIA_URL}{image3}' if image3 else None
-    video_url = f'{base_url}{settings.MEDIA_URL}{video}' if video else None
+    for instance in category_instances:
+        category_name = instance.role_category_name.replace(" ", "_") if instance.role_category_name else "category"
 
-    # Prepare the profile data
-    profile = {
-        'user_id': category_instance.user_id,
-        'name': user.name,
-        'role_category_name': category_instance.role_category_name,
-        'about_yourself': category_instance.about_yourself,
-        'image1': image1_url,
-        'image2': image2_url,
-        'image3': image3_url,
-        'video': video_url,
-         "location": category_instance.location,
-            "latitude": category_instance.latitude,
-            "longitude": category_instance.longitude,
-        'is_primary': category_instance.is_primary
-    }
+        image1 = save_base64_image(instance.image1, f'{user_id}_{category_name}_image1.jpg') if instance.image1 else None
+        image2 = save_base64_image(instance.image2, f'{user_id}_{category_name}_image2.jpg') if instance.image2 else None
+        image3 = save_base64_image(instance.image3, f'{user_id}_{category_name}_image3.jpg') if instance.image3 else None
+        video = save_base64_video(instance.video, f'{user_id}_{category_name}_video.mp4') if instance.video else None
+
+        image1_url = f'{base_url}{settings.MEDIA_URL}{image1}' if image1 else None
+        image2_url = f'{base_url}{settings.MEDIA_URL}{image2}' if image2 else None
+        image3_url = f'{base_url}{settings.MEDIA_URL}{image3}' if image3 else None
+        video_url = f'{base_url}{settings.MEDIA_URL}{video}' if video else None
+
+        profiles.append({
+            'id': instance.id,
+            'name': user.name,
+            'role_category_name': instance.role_category_name,
+            'about_yourself': instance.about_yourself,
+            'image1': image1_url,
+            'image2': image2_url,
+            'image3': image3_url,
+            'video': video_url,
+            'location': instance.location,
+            'latitude': instance.latitude,
+            'longitude': instance.longitude,
+            'is_primary': instance.is_primary,
+        })
+
+    #return Response({'status': 200, 'data': profiles}, status=200)
 
     # Get all distinct categories
-   # allCategory = UsersCategory.objects.all().values('role_category_name').distinct()
+    allCategory = UsersCategory.objects.all().values('role_category_name').distinct()
 
     # Return the response with profile and categories
     return Response({
         'status': 200,
         'msg': 'User role category.',
         'base_url': base_url,
-        'payload': profile,
+        'payload': profiles,
+        'all_category':allCategory,
        
     })
 @api_view(['POST'])
