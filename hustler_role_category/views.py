@@ -82,9 +82,9 @@ def create_category(request):
         category_name = request.data.get('role_category_name')  # Change to the correct field name
         
         # Check if the category already exists
-        if UsersCategory.objects.filter(role_category_name=category_name).exists():
-            return Response({"error": {"error_code": 409, "error": "Category already exists"}}, 
-                            status=status.HTTP_409_CONFLICT)
+        # if UsersCategory.objects.filter(role_category_name=category_name).exists():
+        #     return Response({"error": {"error_code": 409, "error": "Category already exists"}}, 
+        #                     status=status.HTTP_409_CONFLICT)
         
         # If the category does not exist, create a new one
         serializer = UsersCategorySerializer(data=request.data)
@@ -97,6 +97,8 @@ def create_category(request):
                         status=status.HTTP_400_BAD_REQUEST)
 
 import base64
+import binascii
+import re
 import os
 from django.conf import settings
 @api_view(['POST'])
@@ -106,11 +108,12 @@ from django.conf import settings
 def update_category(request):
     base_url = 'http://127.0.0.1:8000'
     user_id = request.data.get('user_id')  # Use 'user_id' for consistency
+    category_id=request.data.get('id')
     category_name=request.data.get('role_category_name')
     print(f"User ID: {user_id}")  # Debugging
 
     try:
-        category_instance = UsersCategory.objects.filter(user_id=user_id, role_category_name=category_name).first()
+        category_instance = UsersCategory.objects.filter(user_id=user_id, role_category_name=category_name,id=int(category_id)).first()
     except UsersCategory.DoesNotExist:
         return Response({
             "error": {
@@ -120,27 +123,40 @@ def update_category(request):
         }, status=status.HTTP_404_NOT_FOUND)
     
     print(category_instance)
-
-    serializer = UpdateUsersCategorySerializer(instance=category_instance, data=request.data)
+    if category_instance:
+        serializer = UpdateUsersCategorySerializer(instance=category_instance, data=request.data)
    
     if serializer.is_valid():
         serializer.save()
 
         def save_base64_image(base64_data, image_name):
-            if base64_data.startswith('data:image'):
-                base64_data = base64_data.split(';base64,')[-1]
+            if not base64_data:
+                return None
 
-            image_data = base64.b64decode(base64_data)
+            try:
+                if base64_data.startswith('data:image'):
+                    base64_data = base64_data.split(';base64,')[-1]
+
+                # Fix padding if needed
+                padding_needed = (4 - len(base64_data) % 4) % 4
+                base64_data += '=' * padding_needed
+
+                image_data = base64.b64decode(base64_data)
+
+            except (binascii.Error, ValueError) as e:
+                # Log the error and return None or handle as per your need
+                print(f"[Warning] Skipping invalid image {image_name}: {e}")
+                return None
+
             image_path = os.path.join(settings.MEDIA_ROOT, 'hustler_images', image_name)
-
-            # Ensure directory exists
             os.makedirs(os.path.dirname(image_path), exist_ok=True)
 
             with open(image_path, 'wb') as f:
                 f.write(image_data)
 
-            # Return relative path for MEDIA_URL use
             return f'hustler_images/{image_name}'
+
+
 
         
         def save_base64_video(base64_data, video_name):
@@ -162,6 +178,11 @@ def update_category(request):
 
             # Return the relative path for MEDIA_URL use
             return f'hustler_videos/{video_name}'
+
+        print(f"Image2 base64 length: {len(category_instance.image1)}")
+        print(f"First 100 chars: {category_instance.image2[:100]}")
+        print(f"Last 100 chars: {category_instance.image2[-100:]}")
+
 
         image1 = save_base64_image(category_instance.image1, f'{user_id}_{category_name}_image1.jpg') if category_instance.image1 else None 
         image2 = save_base64_image(category_instance.image2, f'{user_id}_{category_name}_image2.jpg') if category_instance.image2 else None
