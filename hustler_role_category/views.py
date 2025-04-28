@@ -68,34 +68,72 @@ def haversine(lat1, lon1, lat2, lon2):
     return round(distance_miles, 2)
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
+from django.views.decorators.csrf import csrf_exempt
+
 from .serializers import UsersCategorySerializer
-from .models import UsersCategory  # Assuming the model is named Category
+from .models import UsersCategory  
+
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
 @csrf_exempt
-
-
 def create_category(request):
     if request.method == 'POST':
-        # Assuming 'category_name' is a unique field in the Category model
-        category_name = request.data.get('role_category_name')  # Change to the correct field name
-        user_id=        request.data.get('user_id')
-        
-        # Check if the category already exists
-        if UsersCategory.objects.filter(user_id=user_id,role_category_name=category_name).exists():
-            return Response({"error": {"error_code": 409, "error": "Category already exists for this user"}}, 
-                            status=status.HTTP_409_CONFLICT)
-        
-        # If the category does not exist, create a new one
-        serializer = UsersCategorySerializer(data=request.data)
+        category_name = request.data.get('role_category_name')
+        requested_user_id = request.data.get('user_id')  # Still read from body
+
+        if not category_name:
+            return Response(
+                {"error": {"error_code": 400, "error": "role_category_name is required"}},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not requested_user_id:
+            return Response(
+                {"error": {"error_code": 400, "error": "user_id is required"}},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate: If requested user_id != logged-in user id -> Authentication error
+        if str(request.user.id) != str(requested_user_id):
+            return Response(
+                {"error": {"error_code": 403, "error": "Permission denied: You cannot create a role for another user."}},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+
+        user_id = request.user.id  # Safe
+
+        # Check if the category already exists for this user
+        if UsersCategory.objects.filter(user_id=user_id, role_category_name=category_name).exists():
+            return Response(
+                {"error": {"error_code": 409, "error": "Category already exists for this user"}},
+                status=status.HTTP_409_CONFLICT
+            )
+
+        # Prepare the data to save
+        data = {
+            'user': user_id,
+            'role_category_name': category_name,
+            'is_primary': request.data.get('is_primary', 0)  # default 0 if not given
+        }
+
+        serializer = UsersCategorySerializer(data=data)
+
         if serializer.is_valid():
             serializer.save()
-            return Response({"success": {"code": 200, "data": serializer.data}}, 
-                            status=status.HTTP_200_OK)
-        
-        return Response({"error": {"error_code": 400, "error": serializer.errors}}, 
-                        status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"success": {"code": 200, "data": serializer.data}},
+                status=status.HTTP_200_OK
+            )
+
+        return Response(
+            {"error": {"error_code": 400, "error": serializer.errors}},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 import base64
 import binascii
@@ -111,9 +149,11 @@ def update_category(request):
     user_id = request.data.get('user_id')  # Use 'user_id' for consistency
     category_id=request.data.get('id')
     category_name=request.data.get('role_category_name')
-    print(f"User ID: {user_id}")  # Debugging
-    print(category_name)
-    print(category_id)
+    if str(request.user.id) != str(user_id):
+            return Response(
+                {"error": {"error_code": 403, "error": "Permission denied: You cannot update another user category"}},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
   
     category_instance = UsersCategory.objects.filter(user_id=user_id, role_category_name=category_name,id=category_id).first()
@@ -286,6 +326,11 @@ from django.conf import settings
 def role_category(request):
     data = request.data
     user_id = data.get('user_id')
+    if str(request.user.id) != str(user_id):
+            return Response(
+                {"error": {"error_code": 403, "error": "Permission denied: You cannot fetch another user data"}},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
     try:
         user = Users.objects.get(id=user_id)
@@ -351,6 +396,12 @@ def Show_role_category(request):
 
     if not user_id:
         return Response({'status': 400, 'msg': 'user_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if str(request.user.id) != str(user_id):
+            return Response(
+                {"error": {"error_code": 403, "error": "Permission denied: You cannot fetch another user roles"}},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
     # Get only distinct role_category_names for the specific user
     user_categories = UsersCategory.objects.filter(user_id=user_id).values_list('role_category_name', flat=True).distinct()
