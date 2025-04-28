@@ -33,12 +33,14 @@ def register_user(request):
     if request.method == 'POST':
         email = request.data.get('email')
         username = request.data.get('username')
+        if Users.objects.filter(username=username).exists():
+            # Return a response indicating that the email is already taken
+            return Response({"error": {"error_code": 400, "error": "Username already exists"}}, status=status.HTTP_400_BAD_REQUEST)    
         if Users.objects.filter(email=email).exists():
             # Return a response indicating that the email is already taken
             return Response({"error": {"error_code": 400, "error": "Email already exists"}}, status=status.HTTP_400_BAD_REQUEST)
-        if Users.objects.filter(email=email).exists():
-            # Return a response indicating that the email is already taken
-            return Response({"error": {"error_code": 400, "error": "Username already exists"}}, status=status.HTTP_400_BAD_REQUEST)    
+        
+      
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
