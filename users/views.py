@@ -54,6 +54,14 @@ def register_user(request):
 @csrf_exempt
 def Update_Profile(request):
     user_instance = request.user
+    data=request.data
+  
+
+    if str(request.user.id) != str(data.get('id')):
+            return Response(
+                {"error": {"error_code": 403, "error": "Permission denied: You cannot update another user profile"}},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
     serializer = UpdateUserSerializer(instance=user_instance, data=request.data, partial=True)
     
@@ -193,6 +201,12 @@ def Show_User_Profile(request):
     try:
         data = request.data
         base_url = 'http://127.0.0.1:8000'  # Ideally from settings or dynamically detected
+
+        if str(request.user.id) != str(data.get('user_id')):
+            return Response(
+                {"error": {"error_code": 403, "error": "Permission denied: You cannot see another user profile"}},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         # Check if user exists
         if Users.objects.filter(id=data.get('user_id'), is_staff=False).exists():
