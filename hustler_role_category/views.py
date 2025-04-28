@@ -80,11 +80,12 @@ def create_category(request):
     if request.method == 'POST':
         # Assuming 'category_name' is a unique field in the Category model
         category_name = request.data.get('role_category_name')  # Change to the correct field name
+        user_id=        request.data.get('user_id')
         
         # Check if the category already exists
-        # if UsersCategory.objects.filter(role_category_name=category_name).exists():
-        #     return Response({"error": {"error_code": 409, "error": "Category already exists"}}, 
-        #                     status=status.HTTP_409_CONFLICT)
+        if UsersCategory.objects.filter(user_id=user_id,role_category_name=category_name).exists():
+            return Response({"error": {"error_code": 409, "error": "Category already exists for this user"}}, 
+                            status=status.HTTP_409_CONFLICT)
         
         # If the category does not exist, create a new one
         serializer = UsersCategorySerializer(data=request.data)
@@ -111,20 +112,17 @@ def update_category(request):
     category_id=request.data.get('id')
     category_name=request.data.get('role_category_name')
     print(f"User ID: {user_id}")  # Debugging
+    print(category_name)
+    print(category_id)
 
-    try:
-        category_instance = UsersCategory.objects.filter(user_id=user_id, role_category_name=category_name,id=int(category_id)).first()
-    except UsersCategory.DoesNotExist:
-        return Response({
-            "error": {
-                "error_code": 404,
-                "error": "User category not found"
-            }
-        }, status=status.HTTP_404_NOT_FOUND)
-    
+  
+    category_instance = UsersCategory.objects.filter(user_id=user_id, role_category_name=category_name,id=category_id).first()
+    if not category_instance:
+        return Response({"error": {"error_code": 409, "error": "userid or catgeory id or catgeory name doesnt match with database"}}, 
+                            status=status.HTTP_409_CONFLICT)
     print(category_instance)
-    if category_instance:
-        serializer = UpdateUsersCategorySerializer(instance=category_instance, data=request.data)
+ 
+    serializer = UpdateUsersCategorySerializer(instance=category_instance, data=request.data)
    
     if serializer.is_valid():
         serializer.save()
