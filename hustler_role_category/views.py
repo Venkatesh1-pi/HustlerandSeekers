@@ -274,22 +274,32 @@ from .models import UsersCategory  # Assuming UsersCategory is your model
 base_url = 'http://82.25.86.49/'
 
 # Function to save base64 image
+import base64
+import os
+from django.conf import settings
+
 def save_base64_image(base64_data, image_name):
     if base64_data.startswith('data:image'):
         base64_data = base64_data.split(';base64,')[-1]
 
-    image_data = base64.b64decode(base64_data)
-    image_path = os.path.join(settings.MEDIA_ROOT, 'hustler_images', image_name)
+    # Fix padding
+    missing_padding = len(base64_data) % 4
+    if missing_padding:
+        base64_data += '=' * (4 - missing_padding)
 
-    # Ensure directory exists
+    try:
+        image_data = base64.b64decode(base64_data)
+    except Exception as e:
+        raise ValueError(f"Failed to decode base64 image: {str(e)}")
+
+    image_path = os.path.join(settings.MEDIA_ROOT, 'hustler_images', image_name)
     os.makedirs(os.path.dirname(image_path), exist_ok=True)
 
-    # Save the image data to the file
     with open(image_path, 'wb') as f:
         f.write(image_data)
 
-    # Return the relative path for MEDIA_URL use
     return f'hustler_images/{image_name}'
+
 
 # Function to save base64 video
 def save_base64_video(base64_data, video_name):
