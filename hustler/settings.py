@@ -196,7 +196,7 @@ INSTALLED_APPS = [
 
     # 'hustler_role_category',
 
-    # 'wallet_resume',
+    'wallet_resume',
     
     # 'connect',
 
