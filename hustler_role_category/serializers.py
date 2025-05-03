@@ -41,13 +41,14 @@ class UpdateUsersCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = UsersCategory
         fields = [
-            'id', 'user_id', 'about_yourself',
+            'id', 'user_id', 'role_category_name','about_yourself',
             'image1', 'image2', 'image3', 'video',
             'is_primary', 'location', 'latitude', 'longitude'
         ]
 
     def update(self, instance, validated_data):
         # Update text fields
+        instance.role_category_name = validated_data.get('role_category_name', instance.role_category_name)
         instance.about_yourself = validated_data.get('about_yourself', instance.about_yourself)
         instance.is_primary = validated_data.get('is_primary', instance.is_primary)
         instance.location = validated_data.get('location', instance.location)

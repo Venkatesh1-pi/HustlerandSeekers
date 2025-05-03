@@ -19,7 +19,7 @@ from .models import UsersPosts
 from .models import Chat
 from users.models import Users
 from django.db.models import Q
-#from wallet_resume.models import ResumeWallet
+from wallet_resume.models import ResumeWallet
 # from connect.models import Connect
 # from connect.models import Review
 # from connect.models import Notifications
@@ -43,29 +43,29 @@ import subprocess
 
 import math
 
-def haversine(lat1, lon1, lat2, lon2):
-    """
-    Calculate the great circle distance between two points
-    on the Earth's surface given their latitude and longitude
-    coordinates in decimal degrees.
-    """
-    # Convert latitude and longitude from degrees to radians
-    lat1_rad = math.radians(lat1)
-    lon1_rad = math.radians(lon1)
-    lat2_rad = math.radians(lat2)
-    lon2_rad = math.radians(lon2)
+# def haversine(lat1, lon1, lat2, lon2):
+#     """
+#     Calculate the great circle distance between two points
+#     on the Earth's surface given their latitude and longitude
+#     coordinates in decimal degrees.
+#     """
+#     # Convert latitude and longitude from degrees to radians
+#     lat1_rad = math.radians(lat1)
+#     lon1_rad = math.radians(lon1)
+#     lat2_rad = math.radians(lat2)
+#     lon2_rad = math.radians(lon2)
 
-    # Haversine formula
-    dlon = lon2_rad - lon1_rad
-    dlat = lat2_rad - lat1_rad
-    a = math.sin(dlat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon/2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-    radius_of_earth_km = 6371  # Radius of the Earth in kilometers
-    radius_of_earth_miles = 3958.8  # Radius of the Earth in miles
-    distance_km = radius_of_earth_km * c
-    distance_miles = radius_of_earth_miles * c
+#     # Haversine formula
+#     dlon = lon2_rad - lon1_rad
+#     dlat = lat2_rad - lat1_rad
+#     a = math.sin(dlat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon/2)**2
+#     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+#     radius_of_earth_km = 6371  # Radius of the Earth in kilometers
+#     radius_of_earth_miles = 3958.8  # Radius of the Earth in miles
+#     distance_km = radius_of_earth_km * c
+#     distance_miles = radius_of_earth_miles * c
 
-    return round(distance_miles, 2)
+#     return round(distance_miles, 2)
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -116,7 +116,7 @@ def create_category(request):
 
         # Prepare the data to save
         data = {
-            'user': user_id,
+            'user_id': requested_user_id,
             'role_category_name': category_name,
             'is_primary': request.data.get('is_primary', 0)  # default 0 if not given
         }
@@ -145,8 +145,8 @@ from django.conf import settings
 @authentication_classes([TokenAuthentication])
 @csrf_exempt
 def update_category(request):
-    base_url = 'http://127.0.0.1:8000'
-    user_id = request.data.get('user_id')  # Use 'user_id' for consistency
+    base_url = 'http://82.25.86.49'
+    user_id = request.data.get('user_id') 
     category_id=request.data.get('id')
     category_name=request.data.get('role_category_name')
     if str(request.user.id) != str(user_id):
@@ -156,7 +156,7 @@ def update_category(request):
             )
 
   
-    category_instance = UsersCategory.objects.filter(user_id=user_id, role_category_name=category_name,id=category_id).first()
+    category_instance = UsersCategory.objects.filter(user_id=user_id,id=category_id).first()
     if not category_instance:
         return Response({"error": {"error_code": 409, "error": "userid or catgeory id or catgeory name doesnt match with database"}}, 
                             status=status.HTTP_409_CONFLICT)
@@ -271,7 +271,7 @@ from rest_framework.decorators import api_view
 from .models import UsersCategory  # Assuming UsersCategory is your model
 
 # Base URL for your media files
-base_url = 'http://127.0.0.1:8000/'
+base_url = 'http://82.25.86.49/'
 
 # Function to save base64 image
 def save_base64_image(base64_data, image_name):
@@ -413,54 +413,95 @@ def Show_role_category(request):
         'role_categories': list(user_categories)
     }, status=status.HTTP_200_OK)
 
-# @api_view(['POST'])
-# @permission_classes((IsAuthenticated,))
-# @csrf_exempt
-# def top_profiles(request):
-#     data = request.data
-#     latitude1 = int(float(data['latitude']))
-#     longitude1 = int(float(data['longitude']))
-#     profile = UsersCategory.objects.all().values('id', 'user_id', 'role_category_name', 'summary', 'about_yourself', 'price', 'image1', 'image2', 'image3', 'video', 'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link', 'yt_link', 'other_link', 'is_primary')
-#     temp_list = []
-#     for i in profile:
-#         userData = Users.objects.filter(id = i['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
-#         if userData:
-#             userData = userData[0]
-#             if userData['latitude']:
-#                 latitude2 = int(float(userData['latitude']))
-#                 longitude2 = int(float(userData['longitude']))
-#                 distance = haversine(latitude1, longitude1, latitude2, longitude2)
-#             else:
-#                distance = 0     
-#         else:
-#             distance = 0
-#         if distance < 20:
-#             temp_dict = {}
-#             temp_dict['id'] = i['id']
-#             temp_dict['user_id'] = i['user_id']
-#             temp_dict['user_data'] = userData
-#             temp_dict['role_category_name'] = i['role_category_name']
-#             temp_dict['summary'] = i['summary']
-#             temp_dict['about_yourself'] = i['about_yourself']
-#             temp_dict['price'] = i['price']
-#             temp_dict['image1'] = i['image1']
-#             temp_dict['image2'] = i['image2']
-#             temp_dict['image3'] = i['image3']
-#             temp_dict['video'] = i['video']
-#             temp_dict['twitter_link'] = i['twitter_link']
-#             temp_dict['isnta_link'] = i['isnta_link']
-#             temp_dict['fb_link'] = i['fb_link']
-#             temp_dict['linkedin_link'] = i['linkedin_link']
-#             temp_dict['yt_link'] = i['yt_link']
-#             temp_dict['other_link'] = i['other_link']
-#             temp_dict['is_primary'] = i['is_primary']
-#             temp_dict['distance'] = distance
-#             if ResumeWallet.objects.filter(user_id = data['user_id'] , role_category_id = i['id']).exists():
-#                 temp_dict['is_bookmark'] = "True"
-#             else:
-#                 temp_dict['is_bookmark'] = "False"
-#             temp_list.append(temp_dict)
-#     return Response({'status': 200, 'message': 'Top profile', 'data': temp_list}) 
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def delete_category(request):
+    user_id=request.user.id
+    print(user_id)
+    data = request.data
+    profile = UsersCategory.objects.filter(id = data.get('category_id'),user_id=user_id).delete()
+    return Response({'status':200,'msg':'Category deleted.'})
+
+
+import math
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.response import Response
+from django.views.decorators.csrf import csrf_exempt
+
+def haversine(lat1, lon1, lat2, lon2):
+    """Calculate great-circle distance using Haversine formula."""
+    lat1_rad, lon1_rad = math.radians(lat1), math.radians(lon1)
+    lat2_rad, lon2_rad = math.radians(lat2), math.radians(lon2)
+    dlat = lat2_rad - lat1_rad
+    dlon = lon2_rad - lon1_rad
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return round(6371 * c, 2)  # Distance in kilometers
+
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def top_profiles(request):
+    data = request.data
+
+    try:
+        latitude1 = float(data['latitude'])
+        longitude1 = float(data['longitude'])
+    except (KeyError, ValueError):
+        return Response({'status': 400, 'message': 'Invalid or missing latitude/longitude'})
+
+    profiles = UsersCategory.objects.all().values(
+        'id', 'user_id', 'role_category_name', 'summary', 'about_yourself',
+        'price', 'latitude', 'longitude', 'image1', 'image2', 'image3', 'video',
+        'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link',
+        'yt_link', 'other_link', 'is_primary'
+    )
+
+    temp_list = []
+
+    for profile in profiles:
+        try:
+            lat2 = float(profile['latitude'])
+            lon2 = float(profile['longitude'])
+            distance = haversine(latitude1, longitude1, lat2, lon2)
+        except (TypeError, ValueError):
+            distance = None
+        print(distance)
+        if distance is not None and distance < 20:
+            profile_data = {
+                'id': profile['id'],
+                'user_id': profile['user_id'],
+                'role_category_name': profile['role_category_name'],
+                'about_yourself': profile['about_yourself'],
+                'image1': profile['image1'],
+                'image2': profile['image2'],
+                'image3': profile['image3'],
+                'video': profile['video'],
+                'twitter_link': profile['twitter_link'],
+                'isnta_link': profile['isnta_link'],
+                'fb_link': profile['fb_link'],
+                'linkedin_link': profile['linkedin_link'],
+                'yt_link': profile['yt_link'],
+                'other_link': profile['other_link'],
+                'is_primary': profile['is_primary'],
+                'latitude': profile['latitude'],
+                'longitude': profile['longitude'],
+                'distance': distance,
+                'is_bookmark': ResumeWallet.objects.filter(
+                    user_id=data['user_id'],
+                    role_category_id=profile['id']
+                ).exists()
+            }
+            temp_list.append(profile_data)
+
+    return Response({'status': 200, 'message': 'Top profiles found', 'data': temp_list})
+
+
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
