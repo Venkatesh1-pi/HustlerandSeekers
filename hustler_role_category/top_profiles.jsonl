@@ -1,0 +1,41 @@
+{
+    "status": 200,
+    "message": "Top profiles found",
+    "data": [
+        {
+            "id": 2,
+            "user_id": "1",
+            "user_data": {
+                "id": 1,
+                "username": "naveen",
+                "email": "naveen@gmail.com",
+                "phone": "+919876543210",
+                "image": "http://82.25.86.49//media/user_images/1_profile_image.jpg",
+                "gender": "male",
+                "dob": "1996-05-10",
+                "name": "Naveen",
+                "location": "Chennai, India",
+                "banner_image": "http://82.25.86.49//media/user_images/1_banner_image.jpg",
+                "latitude": "40.7128",
+                "longitude": "-74.0060"
+            },
+            "role_category_name": "worker2",
+            "about_yourself": "10 years of experience in working",
+            "image1": "http://82.25.86.49//media/hustler_images/1_image1.jpg",
+            "image2": "http://82.25.86.49//media/hustler_images/1_image2.jpg",
+            "image3": "http://82.25.86.49//media/hustler_images/1_image3.jpg",
+            "video": "http://82.25.86.49//media/hustler_videos/1_video.mp4",
+            "twitter_link": null,
+            "isnta_link": null,
+            "fb_link": null,
+            "linkedin_link": null,
+            "yt_link": null,
+            "other_link": null,
+            "is_primary": 1,
+            "latitude": "19.1000",
+            "longitude": "72.8500",
+            "distance": 3.95,
+            "is_bookmark": false
+        }
+    ]
+}

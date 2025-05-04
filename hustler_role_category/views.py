@@ -520,8 +520,7 @@ def top_profiles(request):
     temp_list = []
 
     for profile in profiles:
-        print(profile)
-        userData = Users.objects.filter(id = profile['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
+        userData = Users.objects.filter(id = profile['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'name' ,'location', 'banner_image', 'latitude', 'longitude')
         if userData:
             userData = userData[0]
 
@@ -536,7 +535,6 @@ def top_profiles(request):
             distance = haversine(latitude1, longitude1, lat2, lon2)
         except (TypeError, ValueError):
             distance = None
-        print(distance)
         if distance is not None and distance < 20:
             image1 = profile.get('image1')
             image2 = profile.get('image2')
