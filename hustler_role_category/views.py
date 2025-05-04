@@ -195,27 +195,37 @@ def update_category(request):
             return f'hustler_images/{image_name}'
 
 
-
-        
         def save_base64_video(base64_data, video_name):
-            if base64_data.startswith('data:video'):
-                base64_data = base64_data.split(';base64,')[-1]
+            if not base64_data:
+                raise ValueError("No base64 video data provided.")
 
-            # Decode the base64 video data
-            video_data = base64.b64decode(base64_data)
+            try:
+                if base64_data.startswith('data:video'):
+                    base64_data = base64_data.split(';base64,')[-1]
 
-            # Set the video save path
+                # Clean up unwanted characters and whitespace
+                base64_data = base64_data.strip().replace('\n', '').replace('\r', '')
+                base64_data = re.sub(r'[^A-Za-z0-9+/=]', '', base64_data)
+
+                # Ensure proper base64 padding
+                missing_padding = len(base64_data) % 4
+                if missing_padding:
+                    base64_data += '=' * (4 - missing_padding)
+
+                video_data = base64.b64decode(base64_data)
+            except Exception as e:
+                raise ValueError(f"Failed to decode base64 video: {str(e)}")
+
+            # Save video
             video_path = os.path.join(settings.MEDIA_ROOT, 'hustler_videos', video_name)
-
-            # Ensure the directory exists
             os.makedirs(os.path.dirname(video_path), exist_ok=True)
 
-            # Write the video data to the file
             with open(video_path, 'wb') as f:
                 f.write(video_data)
 
-            # Return the relative path for MEDIA_URL use
             return f'hustler_videos/{video_name}'
+
+
 
         print(f"Image2 base64 length: {len(category_instance.image1)}")
         print(f"First 100 chars: {category_instance.image2[:100]}")
@@ -302,25 +312,38 @@ def save_base64_image(base64_data, image_name):
 
 
 # Function to save base64 video
+import base64
+import os
+from django.conf import settings
+
+import base64
+import os
+from django.conf import settings
+
 def save_base64_video(base64_data, video_name):
     if base64_data.startswith('data:video'):
         base64_data = base64_data.split(';base64,')[-1]
 
-    # Decode the base64 video data
-    video_data = base64.b64decode(base64_data)
+    # Fix base64 padding if needed
+    base64_data = base64_data.strip().replace('\n', '').replace('\r', '')
+    missing_padding = len(base64_data) % 4
+    if missing_padding:
+        base64_data += '=' * (4 - missing_padding)
 
-    # Set the video save path
+    try:
+        video_data = base64.b64decode(base64_data)
+    except Exception as e:
+        raise ValueError(f"Failed to decode base64 video: {str(e)}")
+
     video_path = os.path.join(settings.MEDIA_ROOT, 'hustler_videos', video_name)
-
-    # Ensure the directory exists
     os.makedirs(os.path.dirname(video_path), exist_ok=True)
 
-    # Save the video data to the file
     with open(video_path, 'wb') as f:
         f.write(video_data)
 
-    # Return the relative path for MEDIA_URL use
     return f'hustler_videos/{video_name}'
+
+
 from users.models import Users
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
@@ -452,6 +475,28 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return round(6371 * c, 2)  # Distance in kilometers
 
+
+import os
+import base64
+from django.conf import settings
+
+def save_base64_image2(base64_data, image_name):
+    if base64_data.startswith('data:image'):
+        base64_data = base64_data.split(';base64,')[-1]
+
+    image_data = base64.b64decode(base64_data)
+    image_path = os.path.join(settings.MEDIA_ROOT, 'user_images', image_name)
+
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(image_path), exist_ok=True)
+
+    with open(image_path, 'wb') as f:
+        f.write(image_data)
+
+    # Return relative path for MEDIA_URL use
+    return f'user_images/{image_name}'
+
+
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
@@ -475,6 +520,16 @@ def top_profiles(request):
     temp_list = []
 
     for profile in profiles:
+        print(profile)
+        userData = Users.objects.filter(id = profile['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
+        if userData:
+            userData = userData[0]
+
+            image_path = save_base64_image2(userData['image'], f"{userData['id']}_profile_image.jpg") if userData.get('image') else None
+            banner_path = save_base64_image2(userData['banner_image'], f"{userData['id']}_banner_image.jpg") if userData.get('banner_image') else None
+
+            userData['image'] = f"{base_url}{settings.MEDIA_URL}{image_path}" if image_path else None
+            userData['banner_image'] = f"{base_url}{settings.MEDIA_URL}{banner_path}" if banner_path else None
         try:
             lat2 = float(profile['latitude'])
             lon2 = float(profile['longitude'])
@@ -483,15 +538,26 @@ def top_profiles(request):
             distance = None
         print(distance)
         if distance is not None and distance < 20:
+            image1 = profile.get('image1')
+            image2 = profile.get('image2')
+            image3 = profile.get('image3')
+            video = profile.get('video')
+
+            image1_path = save_base64_image(image1, f"{profile['user_id']}_image1.jpg") if image1 else None
+            image2_path = save_base64_image(image2, f"{profile['user_id']}_image2.jpg") if image2 else None
+            image3_path = save_base64_image(image3, f"{profile['user_id']}_image3.jpg") if image3 else None
+            video_path = save_base64_video(video, f"{profile['user_id']}_video.mp4") if video else None
+
             profile_data = {
                 'id': profile['id'],
                 'user_id': profile['user_id'],
+                'user_data': userData,
                 'role_category_name': profile['role_category_name'],
                 'about_yourself': profile['about_yourself'],
-                'image1': profile['image1'],
-                'image2': profile['image2'],
-                'image3': profile['image3'],
-                'video': profile['video'],
+                'image1': f"{base_url}{settings.MEDIA_URL}{image1_path}" if image1_path else None,
+                'image2': f"{base_url}{settings.MEDIA_URL}{image2_path}" if image2_path else None,
+                'image3': f"{base_url}{settings.MEDIA_URL}{image3_path}" if image3_path else None,
+                'video': f"{base_url}{settings.MEDIA_URL}{video_path}" if video_path else None,
                 'twitter_link': profile['twitter_link'],
                 'isnta_link': profile['isnta_link'],
                 'fb_link': profile['fb_link'],
