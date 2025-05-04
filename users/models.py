@@ -39,7 +39,7 @@ class Base64ImageField(models.TextField):
 class Users(AbstractUser):
     user_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     username = models.CharField(max_length=100, unique=True)
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     email = models.CharField(max_length=100, null=True, blank=True)
     is_hustler = models.CharField(max_length=100, null=True, blank=True)
     phone = models.CharField(max_length=100, null=True, blank=True)
