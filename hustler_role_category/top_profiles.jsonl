@@ -5,6 +5,7 @@
         {
             "id": 2,
             "user_id": "1",
+            "name": "Naveen",
             "user_data": {
                 "id": 1,
                 "username": "naveen",
