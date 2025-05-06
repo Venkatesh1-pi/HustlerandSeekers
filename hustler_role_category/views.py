@@ -503,24 +503,40 @@ def save_base64_image2(base64_data, image_name):
 @csrf_exempt
 def top_profiles(request):
     data = request.data
-
+    search_role=data['search_role']
+    if str(request.user.id) != str(data['user_id']):
+        return Response(
+            {"error": {"error_code": 403, "error": "Permission denied: You cannot fetch another user roles"}},
+            status=status.HTTP_403_FORBIDDEN
+        )
     try:
         latitude1 = float(data['latitude'])
         longitude1 = float(data['longitude'])
     except (KeyError, ValueError):
         return Response({'status': 400, 'message': 'Invalid or missing latitude/longitude'})
-
-    profiles = UsersCategory.objects.all().values(
-        'id', 'user_id', 'role_category_name', 'summary', 'about_yourself',
-        'price', 'latitude', 'longitude', 'image1', 'image2', 'image3', 'video',
-        'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link',
-        'yt_link', 'other_link', 'is_primary'
-    )
+    if search_role:
+        profiles = UsersCategory.objects.filter(
+                role_category_name__icontains=search_role  # Filters based on partial match for 'role_category_name'
+            ).values(
+                'id', 'user_id', 'role_category_name', 'summary', 'about_yourself',
+                'price', 'latitude', 'longitude', 'image1', 'image2', 'image3', 'video',
+                'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link',
+                'yt_link', 'other_link', 'is_primary'
+            )
+    else:
+        profiles = UsersCategory.objects.all().values(
+            'id', 'user_id', 'role_category_name', 'summary', 'about_yourself',
+            'price', 'latitude', 'longitude', 'image1', 'image2', 'image3', 'video',
+            'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link',
+            'yt_link', 'other_link', 'is_primary'
+        )
 
     temp_list = []
 
     for profile in profiles:
         userData = Users.objects.filter(id = profile['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'name' ,'location', 'banner_image', 'latitude', 'longitude')
+        name=""
+            
         if userData:
             userData = userData[0]
 
@@ -529,6 +545,7 @@ def top_profiles(request):
 
             userData['image'] = f"{base_url}{settings.MEDIA_URL}{image_path}" if image_path else None
             userData['banner_image'] = f"{base_url}{settings.MEDIA_URL}{banner_path}" if banner_path else None
+            name=userData['name']
         try:
             lat2 = float(profile['latitude'])
             lon2 = float(profile['longitude'])
@@ -549,6 +566,7 @@ def top_profiles(request):
             profile_data = {
                 'id': profile['id'],
                 'user_id': profile['user_id'],
+                'name':name,
                 'user_data': userData,
                 'role_category_name': profile['role_category_name'],
                 'about_yourself': profile['about_yourself'],
@@ -572,10 +590,66 @@ def top_profiles(request):
                 ).exists()
             }
             temp_list.append(profile_data)
+    if temp_list:
 
-    return Response({'status': 200, 'message': 'Top profiles found', 'data': temp_list})
+        return Response({'status': 200, 'message': 'Top profiles found', 'data': temp_list})
+    else:
+        return Response({'status': 200, 'message': 'No profiles found', 'data': temp_list})
 
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def send_message(request):
+    data = request.data
+    if str(request.user.id) != str(data['sender_id']):
+        return Response(
+            {"error": {"error_code": 403, "error": "Permission denied: You cannot fetch another user roles"}},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    chats = Chat()
+    chats.category_id = data['category_id']
+    chats.category_name = data['category_name']
+    chats.sender_id = data['sender_id']
+    chats.receiver_id = data['receiver_id']
+    chats.message = data['message']
+    chats.status = '0'
+    chats.save()
 
+    url = "https://fcm.googleapis.com/fcm/send"
+    userData = Users.objects.filter(id=data['receiver_id']).values('id', 'device_token')[0]
+    senderData = Users.objects.filter(id=data['sender_id']).values('id', 'username', 'device_token')[0]
+
+   # Define the data to be sent in the notification
+    data = {
+        "to": userData['device_token'],
+        "notification": {
+            "body": data['message'],
+            "priority": "high",
+            "message_id": chats.id,
+            "title": senderData['username']+' sent a message',
+            "sound": "app_sound.wav",
+        },
+        "data": {
+            "priority": "high",
+            "title": senderData['username']+' sent a message',
+            "body": data['message'],
+            "message_id": chats.id,
+            "sound": "app_sound.wav",
+            "content_available": True
+        }
+    }
+
+    payload = json.dumps(data)
+
+    headers = {
+        'Authorization': 'key=AAAAMmfUttw:APA91bFl7CTYHRar2M4KAY_GskDEfApLqawNehtyL7_vjNWsF476TAwT1a3Rf5PNkS2F9D6tTUzC8cShbvRYukWU5STpEkeiiIld0Yd8OnBQLL8heqfYfOeNqjCYJxnh_LNhCwmlx-4P',
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.post(url, headers=headers, data=payload)
+    print(response)
+    return Response({'status': 200, 'msg': 'message sent.'})    
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))

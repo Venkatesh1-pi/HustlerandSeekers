@@ -46,7 +46,7 @@ class Users(AbstractUser):
     location = models.CharField(max_length=255, null=True, blank=True)
     password = models.CharField(max_length=100, null=True, blank=True)
     
-    # Updated to base64 storage
+  
     image = Base64ImageField(null=True, blank=True)
     banner_image = Base64ImageField(null=True, blank=True)
     
