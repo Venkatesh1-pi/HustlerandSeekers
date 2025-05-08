@@ -20,9 +20,9 @@ from .models import Chat
 from users.models import Users
 from django.db.models import Q
 from wallet_resume.models import ResumeWallet
-# from connect.models import Connect
+from connect.models import Connect
 # from connect.models import Review
-# from connect.models import Notifications
+from connect.models import Notifications
 # from connect.models import Appointments
 
 from rest_framework.decorators import api_view, permission_classes
@@ -651,6 +651,175 @@ def send_message(request):
     print(response)
     return Response({'status': 200, 'msg': 'message sent.'})    
 
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def connect(request):
+    data = request.data
+    connect = Connect()
+
+    if Connect.objects.filter(user_id=data['user_id'], role_category_id=data['role_category_id'], hustler_id=data['hustler_id']).exists():
+
+        return Response({'status': 400, 'msg': 'Already requested'})
+    else:
+        userData = Users.objects.filter(id = data['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'device_token', 'latitude', 'longitude')
+        hustlerData = Users.objects.filter(id = data['hustler_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'device_token', 'latitude', 'longitude')
+        userDataa = userData[0]
+        hustlerDataa = hustlerData[0]
+        connect.user_id = data['user_id']
+        connect.role_category_id = data['role_category_id']
+        connect.hustler_id = data['hustler_id']
+        connect.status = 'pending'
+        connect.save()
+
+        notification_message = userDataa['username'] + ' wants to connect with you, check the message sent you.'
+        seeker_notification_message = 'You wants to connect with '+hustlerDataa['username']+', check the message you sent.'
+        
+        url = "https://fcm.googleapis.com/fcm/send"
+
+        # Define the data to be sent in the notification
+        dataa = {
+            "to": hustlerDataa['device_token'],
+            "notification": {
+                "body": notification_message,
+                "priority": "high",
+                "message_id": connect.id,
+                "title": userDataa['username']+' sent a connection request',
+                "sound": "app_sound.wav",
+            },
+            "data": {
+                "priority": "high",
+                "title": userDataa['username']+' sent a connection request',
+                "body": notification_message,
+                "message_id": connect.id,
+                "sound": "app_sound.wav",
+                "content_available": True
+            }
+        }
+
+        # Convert the data dictionary to a JSON string
+        payload = json.dumps(dataa)
+
+        # Define the headers
+        headers = {
+            'Authorization': 'key=AAAAMmfUttw:APA91bFl7CTYHRar2M4KAY_GskDEfApLqawNehtyL7_vjNWsF476TAwT1a3Rf5PNkS2F9D6tTUzC8cShbvRYukWU5STpEkeiiIld0Yd8OnBQLL8heqfYfOeNqjCYJxnh_LNhCwmlx-4P',
+            'Content-Type': 'application/json'
+        }
+
+        # Send the POST request with the payload and headers
+        response = requests.post(url, headers=headers, data=payload)
+
+        notifications = Notifications()
+        notifications.user_id = data['user_id']
+        notifications.connect_id = connect.id
+        notifications.hustler_id = data['hustler_id']
+        notifications.notification = notification_message
+        notifications.role_category_id = data['role_category_id']
+        notifications.seeker_notification = seeker_notification_message
+        notifications.notifica_type = 'connect'
+        notifications.status = 'Pending'
+        notifications.save()
+        return Response({'status': 200, 'msg': 'Connection request sent.'})
+
+
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def messages(request):
+    data = request.data    
+    user_id = data['user_id']
+
+    # Get unique category_name + id combos without using distinct()
+    all_chats = Chat.objects.filter(Q(sender_id=user_id) | Q(receiver_id=user_id)).values('category_id', 'category_name', 'id')
+    seen_categories = set()
+    messages_data = []
+
+    for chat in all_chats:
+        key = (chat['category_id'], chat['category_name'])
+        if key not in seen_categories:
+            seen_categories.add(key)
+            messages_data.append(chat)
+
+    temp_list = []
+
+    for i in messages_data:
+        temp_dict = {
+            'id': i['id'],
+            'user_id': user_id,
+            'category_id': i['category_id'],
+            'category_name': i['category_name'],
+            'inbox': []
+        }
+
+        messagess = Chat.objects.filter(category_name=i['category_name']).filter(Q(sender_id=user_id) | Q(receiver_id=user_id)).order_by('-created_at')
+
+        seen_pairs = set()
+        for messag in messagess:
+            pair = tuple(sorted([messag.sender_id, messag.receiver_id]))
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+
+            other_user_id = messag.receiver_id if messag.sender_id == user_id else messag.sender_id
+            userData = Users.objects.filter(id=other_user_id).values(
+                'id', 'username', 'email', 'phone', 'image', 'gender', 'dob',
+                'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude'
+            ).first()
+
+            image_path = save_base64_image2(userData['image'], f"{userData['id']}_profile_image.jpg") if userData.get('image') else None
+            banner_path = save_base64_image2(userData['banner_image'], f"{userData['id']}_banner_image.jpg") if userData.get('banner_image') else None
+
+            userData['image'] = f"{base_url}{settings.MEDIA_URL}{image_path}" if image_path else None
+            userData['banner_image'] = f"{base_url}{settings.MEDIA_URL}{banner_path}" if banner_path else None
+
+            last_message = messag.message
+            last_status = messag.status
+            created_at = messag.created_at.strftime('%Y-%m-%d %I:%M %p')
+
+            temp_dict2 = {
+                'id': messag.id,
+                'userData': userData,
+                'message': last_message,
+                'status': last_status,
+                'created_at': created_at
+            }
+
+            temp_dict['inbox'].append(temp_dict2)
+
+        temp_list.append(temp_dict)
+
+    return Response({'status': 200, 'msg': 'Messages.', 'data': temp_list})
+
+
+
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def messages_list(request):
+    data = request.data    
+    messages_data = Chat.objects.filter((Q(sender_id=data['other_user_id']) & Q(receiver_id=data['user_id'])) | (Q(sender_id=data['user_id']) & Q(receiver_id=data['other_user_id']))).values('id', 'category_id', 'category_name', 'sender_id', 'receiver_id', 'message', 'status', 'created_at')
+    temp_list = []
+
+    for i in messages_data:
+
+        temp_dict = {}
+        temp_dict['id'] = i['id']
+        temp_dict['category_id'] = i['category_id']
+        temp_dict['category_name'] = i['category_name']
+        temp_dict['sender_id'] = i['sender_id']
+        temp_dict['receiver_id'] = i['receiver_id']
+        temp_dict['message'] = i['message']
+        temp_dict['status'] = i['status']
+        temp_dict['created_at'] = i['created_at'].strftime('%Y-%m-%d %I:%M %p')
+
+
+        temp_list.append(temp_dict)
+
+    return Response({'status': 200, 'msg': 'Messages.', 'data': temp_list})    
+
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
 # @csrf_exempt
@@ -720,75 +889,7 @@ def send_message(request):
 #         resumeWallet.save()
 #         return Response({'status':200, 'msg':'Added to your wallet.'})
 
-# @api_view(['POST'])
-# @permission_classes((IsAuthenticated,))
-# @csrf_exempt
-# def connect(request):
-#     data = request.data
-#     connect = Connect()
 
-#     if Connect.objects.filter(user_id=data['user_id'], role_category_id=data['role_category_id'], hustler_id=data['hustler_id']).exists():
-
-#         return Response({'status': 400, 'msg': 'Already requested'})
-#     else:
-#         userData = Users.objects.filter(id = data['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'device_token', 'latitude', 'longitude')
-#         hustlerData = Users.objects.filter(id = data['hustler_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'device_token', 'latitude', 'longitude')
-#         userDataa = userData[0]
-#         hustlerDataa = hustlerData[0]
-#         connect.user_id = data['user_id']
-#         connect.role_category_id = data['role_category_id']
-#         connect.hustler_id = data['hustler_id']
-#         connect.status = 'pending'
-#         connect.save()
-
-#         notification_message = userDataa['username'] + ' wants to connect with you, check the message sent you.'
-#         seeker_notification_message = 'You wants to connect with '+hustlerDataa['username']+', check the message you sent.'
-        
-#         url = "https://fcm.googleapis.com/fcm/send"
-
-#         # Define the data to be sent in the notification
-#         dataa = {
-#             "to": hustlerDataa['device_token'],
-#             "notification": {
-#                 "body": notification_message,
-#                 "priority": "high",
-#                 "message_id": connect.id,
-#                 "title": userDataa['username']+' sent a connection request',
-#                 "sound": "app_sound.wav",
-#             },
-#             "data": {
-#                 "priority": "high",
-#                 "title": userDataa['username']+' sent a connection request',
-#                 "body": notification_message,
-#                 "message_id": connect.id,
-#                 "sound": "app_sound.wav",
-#                 "content_available": True
-#             }
-#         }
-
-#         # Convert the data dictionary to a JSON string
-#         payload = json.dumps(dataa)
-
-#         # Define the headers
-#         headers = {
-#             'Authorization': 'key=AAAAMmfUttw:APA91bFl7CTYHRar2M4KAY_GskDEfApLqawNehtyL7_vjNWsF476TAwT1a3Rf5PNkS2F9D6tTUzC8cShbvRYukWU5STpEkeiiIld0Yd8OnBQLL8heqfYfOeNqjCYJxnh_LNhCwmlx-4P',
-#             'Content-Type': 'application/json'
-#         }
-
-#         # Send the POST request with the payload and headers
-#         response = requests.post(url, headers=headers, data=payload)
-
-#         notifications = Notifications();
-#         notifications.user_id = data['user_id']
-#         notifications.connect_id = connect.id
-#         notifications.hustler_id = data['hustler_id']
-#         notifications.notification = notification_message
-#         notifications.role_category_id = data['role_category_id']
-#         notifications.seeker_notification = seeker_notification_message
-#         notifications.notifica_type = 'connect'
-#         notifications.status = 'Pending'
-#         notifications.save()
-#         return Response({'status': 200, 'msg': 'Connection request sent.'})
     
 
 # @api_view(['POST'])
@@ -1305,65 +1406,3 @@ def send_message(request):
 #     return Response({'status': 200, 'msg': 'message sent.'})         
 
 
-# @api_view(['POST'])
-# @permission_classes((IsAuthenticated,))
-# @csrf_exempt
-# def messages(request):
-#     data = request.data    
-#     messages_data = Chat.objects.filter(Q(sender_id=data['user_id']) | Q(receiver_id=data['user_id'])).values('id', 'category_id', 'category_name').distinct('category_name')
-#     temp_list = []
-
-#     for i in messages_data:
-#         temp_dict = {}
-#         temp_dict['id'] = i['id']
-#         temp_dict['user_id'] = data['user_id']  # Assuming user_id should be the same as in the request data
-#         temp_dict['category_id'] = i['category_id']
-#         temp_dict['category_name'] = i['category_name']
-#         temp_dict['inbox'] = []
-
-#         messagess = Chat.objects.filter(category_name=i['category_name']).filter(Q(sender_id=data['user_id']) | Q(receiver_id=data['user_id'])).values('id', 'sender_id', 'receiver_id', 'message', 'status', 'created_at').distinct('sender_id', 'receiver_id')
-        
-#         for messag in messagess:
-#             if messag['sender_id'] == data['user_id']:
-#                 userData = Users.objects.filter(id=messag['receiver_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')[0]
-#             else:
-#                 userData = Users.objects.filter(id=messag['sender_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')[0]
-#             last_message = Chat.objects.filter(Q(sender_id=data['user_id']) | Q(receiver_id=data['user_id'])).values('id', 'message', 'status', 'created_at').order_by('-created_at').first()
-#             temp_dict2 = {
-#                 'id': messag['id'],
-#                 'userData': userData,
-#                 'message': last_message['message'],
-#                 'status': last_message['status'],
-#                 'created_at': messag['created_at'].strftime('%Y-%m-%d %I:%M %p')
-#             }
-#             temp_dict['inbox'].append(temp_dict2)
-        
-#         temp_list.append(temp_dict)
-
-#     return Response({'status': 200, 'msg': 'Messages.', 'data': temp_list})
-
-
-# @api_view(['POST'])
-# @permission_classes((IsAuthenticated,))
-# @csrf_exempt
-# def messages_list(request):
-#     data = request.data    
-#     messages_data = Chat.objects.filter((Q(sender_id=data['other_user_id']) & Q(receiver_id=data['user_id'])) | (Q(sender_id=data['user_id']) & Q(receiver_id=data['other_user_id']))).values('id', 'category_id', 'category_name', 'sender_id', 'receiver_id', 'message', 'status', 'created_at')
-#     temp_list = []
-
-#     for i in messages_data:
-
-#         temp_dict = {}
-#         temp_dict['id'] = i['id']
-#         temp_dict['category_id'] = i['category_id']
-#         temp_dict['category_name'] = i['category_name']
-#         temp_dict['sender_id'] = i['sender_id']
-#         temp_dict['receiver_id'] = i['receiver_id']
-#         temp_dict['message'] = i['message']
-#         temp_dict['status'] = i['status']
-#         temp_dict['created_at'] = i['created_at'].strftime('%Y-%m-%d %I:%M %p')
-
-
-#         temp_list.append(temp_dict)
-
-#     return Response({'status': 200, 'msg': 'Messages.', 'data': temp_list})    

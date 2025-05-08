@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import create_category,update_category,role_category,Show_role_category,delete_category,top_profiles,send_message
+from .views import create_category,update_category,role_category,Show_role_category,delete_category,top_profiles,send_message,messages_list, messages,connect
 #, ,Show_role_category,messages_list, messages, send_message, get_distance, add_post, Show_role_category, send_notification, get_hustler_slots, booking_appointment, all_appointments, add_review, hustler_links, update_connect_status, notifications, top_reviews, update_category, , mini_resume, add_to_wallet, connect, top_videos
 
 urlpatterns = [
@@ -10,7 +10,7 @@ urlpatterns = [
     path('top_profiles/', top_profiles, name='top_profiles'),
     # path('mini_resume/', mini_resume, name='mini_resume'),
     # path('add_to_wallet/', add_to_wallet, name='add_to_wallet'),
-    # path('connect/', connect, name='connect'),
+    path('connect/', connect, name='connect'),
     # path('top_videos/', top_videos, name='top_videos'),
     # path('add_review/', add_review, name='add_review'),
     # path('top_reviews/', top_reviews, name='top_reviews'),
@@ -25,7 +25,7 @@ urlpatterns = [
     # path('add_post/', add_post, name='add_post'),
     # path('get_distance/', get_distance, name='get_distance'),
     path('send_message/', send_message, name='send_message'),
-    # path('messages/', messages, name='messages'),
-    # path('messages_list/', messages_list, name='messages_list'),
+    path('messages/', messages, name='messages'),
+    path('messages_list/', messages_list, name='messages_list'),
     
 ]
