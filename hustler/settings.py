@@ -198,7 +198,7 @@ INSTALLED_APPS = [
 
     'wallet_resume',
     
-    # 'connect',
+     'connect',
 
     # 'fcm_django',
    
