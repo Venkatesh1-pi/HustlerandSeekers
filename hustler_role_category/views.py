@@ -614,7 +614,28 @@ def send_message(request):
     chats.receiver_id = data['receiver_id']
     chats.message = data['message']
     chats.status = '0'
+    # Handle base64 attachment if provided
+    attachment_b64 = data['attachment']
+    if attachment_b64:
+        try:
+            base64.b64decode(attachment_b64)  # Just to validate it's valid base64
+            chats.attachment = attachment_b64
+        except Exception:
+            return Response(
+                {"error": {"error_code": 400, "error": "Invalid base64 format for attachment."}},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
     chats.save()
+    return Response(
+        {
+            "status": 201,
+            "msg": "Message sent successfully",
+            "chat_id": chats.id,
+            "created_at": chats.created_at
+        },
+        status=status.HTTP_201_CREATED
+    )
 
     url = "https://fcm.googleapis.com/fcm/send"
     userData = Users.objects.filter(id=data['receiver_id']).values('id', 'device_token')[0]
@@ -723,6 +744,44 @@ def connect(request):
         return Response({'status': 200, 'msg': 'Connection request sent.'})
 
 
+
+
+import os
+import base64
+from uuid import uuid4
+from django.conf import settings
+import binascii
+
+# Magic byte sequences for supported file types
+FILE_SIGNATURES = {
+    'jpg': b'\xFF\xD8\xFF',  # JPEG
+    'png': b'\x89\x50\x4E\x47',  # PNG
+    'gif': b'\x47\x49\x46\x38',  # GIF
+    'mp4': b'\x00\x00\x00\x18\x66\x74\x79\x70\x33\x67\x70\x35',  # MP4
+    'avi': b'\x52\x49\x46\x46',  # AVI
+    'pdf': b'\x25\x50\x44\x46',  # PDF
+    'doc': b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1',  # DOC
+    'docx': b'\x50\x4B\x03\x04',  # DOCX (ZIP header)
+    'ppt': b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1',  # PPT
+    'pptx': b'\x50\x4B\x03\x04',  # PPTX (ZIP header)
+}
+
+def detect_file_type(file_bytes):
+    """
+    Detect the file type based on magic bytes.
+    Returns the file extension if detected, otherwise returns None.
+    """
+    # Log the first few bytes of the file for debugging purposes
+    print(f"First few bytes of file: {binascii.hexlify(file_bytes[:20])}")
+
+    for ext, signature in FILE_SIGNATURES.items():
+        if file_bytes.startswith(signature):
+            return ext
+    return 'txt' # Return None if not a supported file type
+
+
+
+
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
@@ -777,11 +836,42 @@ def messages(request):
             last_message = messag.message
             last_status = messag.status
             created_at = messag.created_at.strftime('%Y-%m-%d %I:%M %p')
+            media_url =""
+            if messag.attachment:
+                try:
+                    # Decode the base64 string into raw bytes
+                    decoded_file = base64.b64decode(messag.attachment)
+                    
+                    # Log the first few bytes of the decoded file
+                    print(f"Decoded file first few bytes: {binascii.hexlify(decoded_file[:20])}")
+
+                    # Detect the file type manually using magic bytes
+                    extension = detect_file_type(decoded_file)
+
+                    if not extension:
+                        extension = 'bin'  # Default to binary if the file type is not supported
+
+                    # Save the file with a unique name
+                    file_name = f"{uuid4().hex}.{extension}"
+                    media_path = os.path.join(settings.MEDIA_ROOT, 'chat_attachments', file_name)
+                    os.makedirs(os.path.dirname(media_path), exist_ok=True)
+
+                    with open(media_path, 'wb') as f:
+                        f.write(decoded_file)
+
+                    # Construct the URL to access the file
+                    media_url = os.path.join(settings.MEDIA_URL, 'chat_attachments', file_name)
+                    #temp_dict['attachment'] = request.build_absolute_uri(media_url)
+
+                except Exception as e:
+                    #temp_dict['attachment'] = None  # Fail silently or log the error
+                    print(f"Error processing file: {e}")
 
             temp_dict2 = {
                 'id': messag.id,
                 'userData': userData,
                 'message': last_message,
+                'attachment':request.build_absolute_uri(media_url),
                 'status': last_status,
                 'created_at': created_at
             }
@@ -794,31 +884,66 @@ def messages(request):
 
 
 
+
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
 @csrf_exempt
 def messages_list(request):
-    data = request.data    
-    messages_data = Chat.objects.filter((Q(sender_id=data['other_user_id']) & Q(receiver_id=data['user_id'])) | (Q(sender_id=data['user_id']) & Q(receiver_id=data['other_user_id']))).values('id', 'category_id', 'category_name', 'sender_id', 'receiver_id', 'message', 'status', 'created_at')
+    data = request.data
+    messages_data = Chat.objects.filter(
+        (Q(sender_id=data['other_user_id']) & Q(receiver_id=data['user_id'])) |
+        (Q(sender_id=data['user_id']) & Q(receiver_id=data['other_user_id']))
+    ).values('id', 'category_id', 'category_name', 'sender_id', 'receiver_id', 'message', 'status', 'created_at', 'attachment')
+
     temp_list = []
 
     for i in messages_data:
+        temp_dict = {
+            'id': i['id'],
+            'category_id': i['category_id'],
+            'category_name': i['category_name'],
+            'sender_id': i['sender_id'],
+            'receiver_id': i['receiver_id'],
+            'message': i['message'],
+            'status': i['status'],
+            'created_at': i['created_at'].strftime('%Y-%m-%d %I:%M %p'),
+            'attachment': None  # default
+        }
+        # If base64 attachment exists
+        if i['attachment']:
+            try:
+                # Decode the base64 string into raw bytes
+                decoded_file = base64.b64decode(i['attachment'])
+                
+                # Log the first few bytes of the decoded file
+                print(f"Decoded file first few bytes: {binascii.hexlify(decoded_file[:20])}")
 
-        temp_dict = {}
-        temp_dict['id'] = i['id']
-        temp_dict['category_id'] = i['category_id']
-        temp_dict['category_name'] = i['category_name']
-        temp_dict['sender_id'] = i['sender_id']
-        temp_dict['receiver_id'] = i['receiver_id']
-        temp_dict['message'] = i['message']
-        temp_dict['status'] = i['status']
-        temp_dict['created_at'] = i['created_at'].strftime('%Y-%m-%d %I:%M %p')
+                # Detect the file type manually using magic bytes
+                extension = detect_file_type(decoded_file)
 
+                if not extension:
+                    extension = 'bin'  # Default to binary if the file type is not supported
 
+                # Save the file with a unique name
+                file_name = f"{uuid4().hex}.{extension}"
+                media_path = os.path.join(settings.MEDIA_ROOT, 'chat_attachments', file_name)
+                os.makedirs(os.path.dirname(media_path), exist_ok=True)
+
+                with open(media_path, 'wb') as f:
+                    f.write(decoded_file)
+
+                # Construct the URL to access the file
+                media_url = os.path.join(settings.MEDIA_URL, 'chat_attachments', file_name)
+                temp_dict['attachment'] = request.build_absolute_uri(media_url)
+
+            except Exception as e:
+                temp_dict['attachment'] = None  # Fail silently or log the error
+                print(f"Error processing file: {e}")
         temp_list.append(temp_dict)
 
-    return Response({'status': 200, 'msg': 'Messages.', 'data': temp_list})    
+    return Response({'status': 200, 'msg': 'Messages.', 'data': temp_list})
+  
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))

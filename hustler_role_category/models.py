@@ -102,11 +102,14 @@ class UsersPosts(models.Model):
 	created_at = models.DateTimeField(auto_now_add=True)
 
 class Chat(models.Model):
+    category_id = models.CharField(max_length=100, null=True, blank=True)
+    category_name = models.CharField(max_length=100, null=True, blank=True)
+    sender_id = models.CharField(max_length=100, null=True, blank=True)
+    receiver_id = models.CharField(max_length=100, null=True, blank=True)
+    message = models.CharField(max_length=500, null=True, blank=True)
+    status = models.CharField(max_length=500, null=True, blank=True)
+    attachment = models.TextField(null=True, blank=True)  # Base64 attachment field
+    created_at = models.DateTimeField(auto_now_add=True)
 
-	category_id=models.CharField(max_length=100, null=True, blank=True)
-	category_name=models.CharField(max_length=100, null=True, blank=True)
-	sender_id=models.CharField(max_length=100, null=True, blank=True)
-	receiver_id=models.CharField(max_length=100, null=True, blank=True)
-	message=models.CharField(max_length=500, null=True, blank=True)
-	status=models.CharField(max_length=500, null=True, blank=True)
-	created_at = models.DateTimeField(auto_now_add=True)
+    def __str__(self):
+        return f"Message from {self.sender_id} to {self.receiver_id} at {self.created_at}"
