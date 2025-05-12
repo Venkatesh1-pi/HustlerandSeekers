@@ -1,0 +1,48 @@
+# 1. Initialize a new Git repo (only if not already)
+git init
+
+# 2. Add all files
+git add .
+
+# 3. Commit your code
+git commit -m "full image path  added in shooweuser"
+
+# 4. Add your Git remote (replace URL with your Git server repo)
+git remote add origin https://github.com/Venkatesh1-pi/HustlerandSeekers.git
+
+# 5. Push to the main branch
+git branch -M main
+git push -u origin main
+
+git push -u origin main --force
+
+ssh root@82.25.86.49
+passcode_vps:cn;&aJy00;v*nMWJMv!2
+
+
+
+
+#------------------------------------------------
+rm -rf HustlerandSeekers
+
+source venv/bin/activate
+
+python manage.py migrate
+pip install gunicorn
+sudo nano /etc/systemd/system/HustlerandSeekers.gunicorn.socket
+sudo nano /etc/systemd/system/HustlerandSeekers.gunicorn.service
+
+sudo nano /etc/systemd/system/hustler.service
+
+sudo systemctl start HustlerandSeekers.gunicorn.socket
+sudo systemctl start HustlerandSeekers.gunicorn.service
+sudo systemctl enable HustlerandSeekers.gunicorn.socket
+sudo systemctl enable HustlerandSeekers.gunicorn.service
+sudo systemctl status HustlerandSeekers.gunicorn.socket
+sudo systemctl status HustlerandSeekers.gunicorn.service
+sudo ln -s /etc/nginx/sites-available/HustlerandSeekers
+
+
+sudo nginx -t
+sudo service nginx restart
+
