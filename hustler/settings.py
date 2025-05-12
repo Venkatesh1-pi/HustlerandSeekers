@@ -52,7 +52,15 @@ from pathlib import Path
 
 import os
 
+from django.contrib.messages import constants as messages
 
+MESSAGE_TAGS = {
+    messages.DEBUG: 'alert-info',  # Custom class for debug messages
+    messages.INFO: 'alert-info',    # Bootstrap info color
+    messages.SUCCESS: 'alert-success',  # Bootstrap success color
+    messages.WARNING: 'alert-warning',  # Bootstrap warning color
+    messages.ERROR: 'alert-danger',  # Bootstrap danger color
+}
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 
@@ -119,6 +127,8 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
 
 
 
+CORS_ALLOW_ALL_ORIGINS = True  # For testing only. Restrict in production.
+CSRF_TRUSTED_ORIGINS = ['82.25.86.49', '127.0.0.1:8000']
 
 
 
@@ -195,6 +205,7 @@ INSTALLED_APPS = [
 
 
     # 'hustler_role_category',
+    'corsheaders',
 
     'wallet_resume',
     
@@ -219,7 +230,7 @@ FCM_DJANGO_SETTINGS = {
 
 MIDDLEWARE = [
 
-
+   'corsheaders.middleware.CorsMiddleware',
 
     'django.middleware.security.SecurityMiddleware',
 
@@ -363,8 +374,14 @@ WSGI_APPLICATION = 'hustler.wsgi.application'
 
 
 
-
-
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
 
 
 

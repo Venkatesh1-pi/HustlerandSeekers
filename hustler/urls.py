@@ -17,6 +17,8 @@ urlpatterns = [
     path('api/', include('users.urls')),
      path('news/', include('news.urls')),
     path('api/role_category/', include('hustler_role_category.urls')),
+    
+
 
 
     # path('api/role_category/', include('hustler_role_category.urls')),

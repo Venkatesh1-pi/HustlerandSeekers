@@ -11,6 +11,7 @@ urlpatterns = [
     # path('mini_resume/', mini_resume, name='mini_resume'),
     # path('add_to_wallet/', add_to_wallet, name='add_to_wallet'),
     path('connect/', connect, name='connect'),
+    
     # path('top_videos/', top_videos, name='top_videos'),
     # path('add_review/', add_review, name='add_review'),
     # path('top_reviews/', top_reviews, name='top_reviews'),
