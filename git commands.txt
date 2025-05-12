@@ -5,7 +5,7 @@ git init
 git add .
 
 # 3. Commit your code
-git commit -m "attachement added in send_meesages"
+git commit -m "WebSocket update in messages"
 
 # 4. Add your Git remote (replace URL with your Git server repo)
 git remote add origin https://github.com/Venkatesh1-pi/HustlerandSeekers.git
@@ -26,7 +26,7 @@ passcode_vps:cn;&aJy00;v*nMWJMv!2
 rm -rf HustlerandSeekers
  virtualenv venv
 source venv/bin/activate
-pip install djangorestframework-simplejwt django requests numpy geopy xmltodict pillow bs4 fcm_django daphne
+pip install djangorestframework-simplejwt django requests numpy geopy xmltodict pillow bs4 fcm_django daphne django-cors-headers
 python manage.py migrate
 pip install gunicorn
 sudo nano /etc/systemd/system/HustlerandSeekers.gunicorn.socket

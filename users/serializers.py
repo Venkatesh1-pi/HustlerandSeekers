@@ -50,21 +50,12 @@ class UpdateUserSerializer(serializers.ModelSerializer):
             instance.longitude = validated_data.get('longitude', instance.longitude)
             instance.radius_km = validated_data.get('radius_km', instance.radius_km)
 
-            # Decode and update image field
-            image_data = validated_data.get('image', None)
-            if image_data:
-                if image_data.startswith("data:image"):
-                    image_data = image_data.split(",")[1]
-                instance.image = base64.b64encode(base64.b64decode(image_data)).decode('utf-8')
+            if 'image' in validated_data:
+                instance.image = validated_data['image']
+            if 'banner_image' in validated_data:
+                instance.banner_image = validated_data['banner_image']
 
-            # Decode and update banner_image field
-            banner_image_data = validated_data.get('banner_image', None)
-            if banner_image_data:
-                if banner_image_data.startswith("data:image"):
-                    banner_image_data = banner_image_data.split(",")[1]
-                instance.banner_image = base64.b64encode(base64.b64decode(banner_image_data)).decode('utf-8')
-
-            instance.save()
+                instance.save()
 
         except IntegrityError as e:
             if 'UNIQUE constraint failed' in str(e):

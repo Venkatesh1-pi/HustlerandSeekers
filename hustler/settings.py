@@ -127,8 +127,8 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
 
 
 
-CORS_ALLOW_ALL_ORIGINS = True  # For testing only. Restrict in production.
-CSRF_TRUSTED_ORIGINS = ['82.25.86.49', '127.0.0.1:8000']
+# CORS_ALLOW_ALL_ORIGINS = True  # For testing only. Restrict in production.
+# CSRF_TRUSTED_ORIGINS = ['127.0.0.1:8000']
 
 
 

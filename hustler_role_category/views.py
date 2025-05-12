@@ -180,19 +180,19 @@ def update_category(request):
                 base64_data += '=' * padding_needed
 
                 image_data = base64.b64decode(base64_data)
+                image_path = os.path.join(settings.MEDIA_ROOT, 'hustler_images', image_name)
+                os.makedirs(os.path.dirname(image_path), exist_ok=True)
+
+                with open(image_path, 'wb') as f:
+                    f.write(image_data)
+
+                return f'hustler_images/{image_name}'
 
             except (binascii.Error, ValueError) as e:
-                # Log the error and return None or handle as per your need
-                print(f"[Warning] Skipping invalid image {image_name}: {e}")
+               
                 return None
 
-            image_path = os.path.join(settings.MEDIA_ROOT, 'hustler_images', image_name)
-            os.makedirs(os.path.dirname(image_path), exist_ok=True)
-
-            with open(image_path, 'wb') as f:
-                f.write(image_data)
-
-            return f'hustler_images/{image_name}'
+            
 
 
         def save_base64_video(base64_data, video_name):
@@ -214,7 +214,7 @@ def update_category(request):
 
                 video_data = base64.b64decode(base64_data)
             except Exception as e:
-                raise ValueError(f"Failed to decode base64 video: {str(e)}")
+                return None
 
             # Save video
             video_path = os.path.join(settings.MEDIA_ROOT, 'hustler_videos', video_name)
@@ -299,16 +299,17 @@ def save_base64_image(base64_data, image_name):
 
     try:
         image_data = base64.b64decode(base64_data)
-    except Exception as e:
-        raise ValueError(f"Failed to decode base64 image: {str(e)}")
+        image_path = os.path.join(settings.MEDIA_ROOT, 'hustler_images', image_name)
+        os.makedirs(os.path.dirname(image_path), exist_ok=True)
 
-    image_path = os.path.join(settings.MEDIA_ROOT, 'hustler_images', image_name)
-    os.makedirs(os.path.dirname(image_path), exist_ok=True)
+        with open(image_path, 'wb') as f:
+            f.write(image_data)
 
-    with open(image_path, 'wb') as f:
-        f.write(image_data)
+        return f'hustler_images/{image_name}'
+    except:
+        return None
 
-    return f'hustler_images/{image_name}'
+    
 
 
 # Function to save base64 video
@@ -332,16 +333,17 @@ def save_base64_video(base64_data, video_name):
 
     try:
         video_data = base64.b64decode(base64_data)
-    except Exception as e:
-        raise ValueError(f"Failed to decode base64 video: {str(e)}")
+        video_path = os.path.join(settings.MEDIA_ROOT, 'hustler_videos', video_name)
+        os.makedirs(os.path.dirname(video_path), exist_ok=True)
 
-    video_path = os.path.join(settings.MEDIA_ROOT, 'hustler_videos', video_name)
-    os.makedirs(os.path.dirname(video_path), exist_ok=True)
+        with open(video_path, 'wb') as f:
+            f.write(video_data)
 
-    with open(video_path, 'wb') as f:
-        f.write(video_data)
+        return f'hustler_videos/{video_name}'
+    except:
+       return None
 
-    return f'hustler_videos/{video_name}'
+    
 
 
 from users.models import Users
@@ -481,20 +483,32 @@ import base64
 from django.conf import settings
 
 def save_base64_image2(base64_data, image_name):
+
     if base64_data.startswith('data:image'):
         base64_data = base64_data.split(';base64,')[-1]
 
-    image_data = base64.b64decode(base64_data)
-    image_path = os.path.join(settings.MEDIA_ROOT, 'user_images', image_name)
+    # Fix padding
+    missing_padding = len(base64_data) % 4
+    if missing_padding:
+        base64_data += '=' * (4 - missing_padding)
 
-    # Ensure directory exists
-    os.makedirs(os.path.dirname(image_path), exist_ok=True)
+    try:
+        image_data = base64.b64decode(base64_data)
+        image_path = os.path.join(settings.MEDIA_ROOT, 'user_images', image_name)
 
-    with open(image_path, 'wb') as f:
-        f.write(image_data)
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(image_path), exist_ok=True)
 
-    # Return relative path for MEDIA_URL use
-    return f'user_images/{image_name}'
+        with open(image_path, 'wb') as f:
+            f.write(image_data)
+
+        # Return relative path for MEDIA_URL use
+        return f'user_images/{image_name}'
+    except:
+            return None
+
+   
+   
 
 
 @api_view(['POST'])
@@ -620,7 +634,7 @@ def send_message(request):
             base64.b64decode(attachment_b64)
             chat.attachment = attachment_b64
         except Exception:
-            return Response({"error": {"error_code": 400, "error": "Invalid base64 format"}}, status=400)
+            return None
 
     chat.save()
 
@@ -703,7 +717,7 @@ from users.models import Users
 def messages(request):
    
 
-    base_url = "http://127.0.0.1:8000"  # Replace with your actual base URL or import from settings
+    base_url = "http://82.25.86.49"  # Replace with your actual base URL or import from settings
     user_id = request.data.get('user_id')
 
     all_chats = Chat.objects.filter(Q(sender_id=user_id) | Q(receiver_id=user_id)).values('category_id', 'category_name', 'id')
@@ -815,48 +829,63 @@ def messages(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
 @csrf_exempt
 def messages_list(request):
     data = request.data
-    user_id = data['user_id']
-    other_user_id = data['other_user_id']
+    messages_data = Chat.objects.filter(
+        (Q(sender_id=data['other_user_id']) & Q(receiver_id=data['user_id'])) |
+        (Q(sender_id=data['user_id']) & Q(receiver_id=data['other_user_id']))
+    ).values('id', 'category_id', 'category_name', 'sender_id', 'receiver_id', 'message', 'status', 'created_at', 'attachment')
 
-    chats = Chat.objects.filter(
-        Q(sender_id=user_id, receiver_id=other_user_id) |
-        Q(sender_id=other_user_id, receiver_id=user_id)
-    ).order_by('created_at')
+    temp_list = []
 
-    response_data = []
-    for chat in chats:
-        attachment_url = None
-        if chat.attachment:
+    for i in messages_data:
+        temp_dict = {
+            'id': i['id'],
+            'category_id': i['category_id'],
+            'category_name': i['category_name'],
+            'sender_id': i['sender_id'],
+            'receiver_id': i['receiver_id'],
+            'message': i['message'],
+            'status': i['status'],
+            'created_at': i['created_at'].strftime('%Y-%m-%d %I:%M %p'),
+            'attachment': None  # default
+        }
+        # If base64 attachment exists
+        if i['attachment']:
             try:
-                decoded = base64.b64decode(chat.attachment)
-                ext = detect_file_type(decoded) or "bin"
-                filename = f"{uuid4().hex}.{ext}"
-                path = os.path.join(settings.MEDIA_ROOT, "chat_attachments", filename)
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, 'wb') as f:
-                    f.write(decoded)
-                attachment_url = request.build_absolute_uri(os.path.join(settings.MEDIA_URL, "chat_attachments", filename))
+                # Decode the base64 string into raw bytes
+                decoded_file = base64.b64decode(i['attachment'])
+                
+                # Log the first few bytes of the decoded file
+                print(f"Decoded file first few bytes: {binascii.hexlify(decoded_file[:20])}")
+
+                # Detect the file type manually using magic bytes
+                extension = detect_file_type(decoded_file)
+
+                if not extension:
+                    extension = 'bin'  # Default to binary if the file type is not supported
+
+                # Save the file with a unique name
+                file_name = f"{uuid4().hex}.{extension}"
+                media_path = os.path.join(settings.MEDIA_ROOT, 'chat_attachments', file_name)
+                os.makedirs(os.path.dirname(media_path), exist_ok=True)
+
+                with open(media_path, 'wb') as f:
+                    f.write(decoded_file)
+
+                # Construct the URL to access the file
+                media_url = os.path.join(settings.MEDIA_URL, 'chat_attachments', file_name)
+                temp_dict['attachment'] = request.build_absolute_uri(media_url)
+
             except Exception as e:
-                print("Attachment decode error:", e)
+                temp_dict['attachment'] = None  # Fail silently or log the error
+                print(f"Error processing file: {e}")
+        temp_list.append(temp_dict)
 
-        response_data.append({
-            'id': chat.id,
-            'category_id': chat.category_id,
-            'category_name': chat.category_name,
-            'sender_id': chat.sender_id,
-            'receiver_id': chat.receiver_id,
-            'message': chat.message,
-            'status': chat.status,
-            'created_at': chat.created_at.strftime('%Y-%m-%d %I:%M %p'),
-            'attachment': attachment_url
-        })
-
-    return Response({'status': 200, 'msg': 'Messages.', 'data': response_data})
+    return Response({'status': 200, 'msg': 'Messages.', 'data': temp_list})
 
   
 
