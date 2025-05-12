@@ -283,17 +283,21 @@ def Show_User_Profile(request):
                 if base64_data.startswith('data:image'):
                     base64_data = base64_data.split(';base64,')[-1]
 
-                image_data = base64.b64decode(base64_data)
-                image_path = os.path.join(settings.MEDIA_ROOT, 'user_images', image_name)
+                 try:
+                    missing_padding = len(base64_data) % 4
+                    if missing_padding:
+                        base64_data += '=' * (4 - missing_padding)
+                    image_data = base64.b64decode(base64_data)
+                except Exception as e:
+                    return None
 
-                # Ensure directory exists
+                image_path = os.path.join(settings.MEDIA_ROOT, 'user_images', image_name)
                 os.makedirs(os.path.dirname(image_path), exist_ok=True)
 
                 with open(image_path, 'wb') as f:
                     f.write(image_data)
 
-                # Return relative path for MEDIA_URL use
-                return f'user_images/{image_name}'
+                return f'user_images/{image_name}'  # Relative to MEDIA_URL
 
             # Process images and generate full URLs
             image_path = save_base64_image(user.image, f'{user.id}_profile_image.jpg') if user.image else None
@@ -323,7 +327,7 @@ def Show_User_Profile(request):
             return Response({'status': 403, 'msg': 'Invalid User.'})
     except Exception as e:
         print(str(e))
-        return Response({'status': 403, 'msg': 'Something went wrong.'})
+        return Response({'status': 403, 'msg': 'Something went wrong.{e}'})
 
 
        
