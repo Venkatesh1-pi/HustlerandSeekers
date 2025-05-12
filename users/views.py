@@ -48,23 +48,79 @@ def register_user(request):
         return Response({"error":{"error_code": 400,"error": serializer.errors}}, status=status.HTTP_400_BAD_REQUEST)
 
 
+
+def save_base64_image(base64_data, image_name):
+    if base64_data.startswith('data:image'):
+        base64_data = base64_data.split(';base64,')[-1]
+    base64_data = base64_data.replace('\n', '').replace('\r', '').replace(' ', '')
+    
+    # Padding fix
+   
+
+    try:
+        missing_padding = len(base64_data) % 4
+        if missing_padding:
+            base64_data += '=' * (4 - missing_padding)
+        image_data = base64.b64decode(base64_data)
+    except Exception as e:
+        return None
+
+    image_path = os.path.join(settings.MEDIA_ROOT, 'user_images', image_name)
+    os.makedirs(os.path.dirname(image_path), exist_ok=True)
+
+    with open(image_path, 'wb') as f:
+        f.write(image_data)
+
+    return f'user_images/{image_name}'  # Relative to MEDIA_URL
+
+
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
 @authentication_classes([TokenAuthentication])
 @csrf_exempt
 def Update_Profile(request):
+    base_url = 'http://82.25.86.49/'
     user_instance = request.user
-    data=request.data
-  
+    data = request.data.copy()  # make mutable
 
-    if str(request.user.id) != str(data.get('id')):
-            return Response(
-                {"error": {"error_code": 403, "error": "Permission denied: You cannot update another user profile"}},
-                status=status.HTTP_403_FORBIDDEN
-            )
+    if str(user_instance.id) != str(data.get('id')):
+        return Response({
+            "error": {
+                "error_code": 403,
+                "error": "Permission denied: You cannot update another user profile"
+            }
+        }, status=status.HTTP_403_FORBIDDEN)
 
-    serializer = UpdateUserSerializer(instance=user_instance, data=request.data, partial=True)
-    
+    # Handle base64 image if present
+    if 'image' in data and data['image'].startswith('data:image'):
+        try:
+            image_path = save_base64_image(data['image'], f'{user_instance.id}_profile_image.jpg')
+            image_url = f'{base_url}{settings.MEDIA_URL}{image_path}' if image_path else None
+
+            data['image'] = image_url
+        except ValueError as e:
+            return Response({
+                "error": {
+                    "error_code": 400,
+                    "error": str(e)
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    if 'banner_image' in data and data['banner_image'].startswith('data:image'):
+        try:
+            banner_path = save_base64_image(data['banner_image'], f'{user_instance.id}_banner_image.jpg')
+            banner_url = f'{base_url}{settings.MEDIA_URL}{banner_path}' if banner_path else None
+            data['banner_image'] = banner_url
+        except ValueError as e:
+            return Response({
+                "error": {
+                    "error_code": 400,
+                    "error": str(e)
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+    serializer = UpdateUserSerializer(instance=user_instance, data=data, partial=True)
+
     if serializer.is_valid():
         new_username = serializer.validated_data.get('username')
         if new_username and user_exists(new_username, user_instance):
@@ -78,11 +134,20 @@ def Update_Profile(request):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         serializer.save()
+
+        # Generate full URLs
+        
+        response_data = serializer.data
+      
+        
+
+      
+
         return Response({
             "success": {
                 "code": 200,
-                "base_url": 'https://hustlersandseekers.co/hustler/media/',
-                "data": serializer.data
+                "base_url": base_url,
+                "data": response_data
             }
         }, status=status.HTTP_200_OK)
 
@@ -92,6 +157,7 @@ def Update_Profile(request):
             "error": serializer.errors
         }
     }, status=status.HTTP_400_BAD_REQUEST)
+
 
 def user_exists(username, current_user):
     # Check if any other user has the same username
@@ -200,7 +266,7 @@ from django.conf import settings
 def Show_User_Profile(request):
     try:
         data = request.data
-        base_url = 'http://127.0.0.1:8000'  # Ideally from settings or dynamically detected
+        base_url = 'http://82.25.86.49'  # Ideally from settings or dynamically detected
 
         if str(request.user.id) != str(data.get('user_id')):
             return Response(
