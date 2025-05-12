@@ -283,7 +283,7 @@ def Show_User_Profile(request):
                 if base64_data.startswith('data:image'):
                     base64_data = base64_data.split(';base64,')[-1]
 
-                 try:
+                try:
                     missing_padding = len(base64_data) % 4
                     if missing_padding:
                         base64_data += '=' * (4 - missing_padding)
