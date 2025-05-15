@@ -1,88 +1,170 @@
 import json
+import base64
 from channels.generic.websocket import AsyncWebsocketConsumer
-from .models import Chat
+from channels.db import database_sync_to_async
+from django.contrib.auth.models import AnonymousUser
+from rest_framework.authtoken.models import Token
 from django.contrib.auth import get_user_model
-from datetime import datetime
-from asgiref.sync import sync_to_async
-import base64, os
+from hustler_role_category.models import Chat
+import os
+import base64
 from uuid import uuid4
 from django.conf import settings
+import binascii
+import requests
 
+FILE_SIGNATURES = {
+    'jpg': b'\xFF\xD8\xFF',  
+    'png': b'\x89\x50\x4E\x47',  
+    'gif': b'\x47\x49\x46\x38',  
+    'mp4': b'\x00\x00\x00\x18\x66\x74\x79\x70\x33\x67\x70\x35',  
+    'avi': b'\x52\x49\x46\x46',  
+    'pdf': b'\x25\x50\x44\x46',  
+    'doc': b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1',  
+    'docx': b'\x50\x4B\x03\x04',  
+    'ppt': b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1',  
+    'pptx': b'\x50\x4B\x03\x04',  
+}
+
+def detect_file_type(file_bytes):
+    for ext, signature in FILE_SIGNATURES.items():
+        if file_bytes.startswith(signature):
+            return ext
+    return 'txt'
 User = get_user_model()
-
+base_url = "http://82.25.86.49"
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.room_name = self.scope['url_route']['kwargs']['room_name']
-        self.room_group_name = f"chat_{self.room_name}"
+        self.user = await self.get_user_from_token(self.scope)
 
+        if not self.user or isinstance(self.user, AnonymousUser):
+            # Close connection if not authenticated
+            await self.close()
+            return
+
+        # Unique group per user for private messaging
+        self.room_group_name = f'chat_{self.user.id}'
+
+        # Add this channel to the user-specific group
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
-
         await self.accept()
+        print(f"User {self.user.id} connected to group {self.room_group_name}")
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
+        # Remove from group on disconnect
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
+            print(f"User {self.user.id} disconnected from group {self.room_group_name}")
 
     async def receive(self, text_data):
-        data = json.loads(text_data)
+        try:
+            data = json.loads(text_data)
+            sender_id = str(data.get('sender_id'))
 
-        message = data['message']
-        sender_id = data['sender_id']
-        receiver_id = data['receiver_id']
-        category_id = data.get('category_id')
-        category_name = data.get('category_name')
-        attachment = data.get('attachment')
+            # Verify the sender matches the authenticated user
+            if str(self.user.id) != sender_id:
+                await self.send(text_data=json.dumps({
+                    "error": {"error_code": 403, "error": "Permission denied."}
+                }))
+                return
 
-        chat_id, created_at, attachment_url = await self.save_message(
-            sender_id, receiver_id, message, category_id, category_name, attachment
-        )
+            # Save the chat message in DB
+            chat = await self.save_chat_message(data)
 
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'chat_message',
-                'message': message,
-                'sender_id': sender_id,
-                'receiver_id': receiver_id,
-                'chat_id': chat_id,
-                'created_at': created_at,
-                'attachment': attachment_url
-            }
-        )
+            # Notify the receiver's group with message info
+            receiver_room = f'chat_{chat.receiver_id}'
+            media_url = ""
+            if chat.attachment:
+                try:
+                    decoded_file = base64.b64decode(chat.attachment)
+                    extension = detect_file_type(decoded_file)
+                    file_name = f"{uuid4().hex}.{extension}"
+                    media_path = os.path.join(settings.MEDIA_ROOT, 'chat_attachments', file_name)
+                    os.makedirs(os.path.dirname(media_path), exist_ok=True)
+                    with open(media_path, 'wb') as f:
+                        f.write(decoded_file)
+                    media_url = os.path.join(settings.MEDIA_URL, 'chat_attachments', file_name)
+                except Exception as e:
+                    print(f"Attachment processing failed: {e}")
+            print(media_url)
+            await self.channel_layer.group_send(
+                receiver_room,
+                {
+                    'type': 'chat_message',
+                    'message': {
+                        "chat_id": chat.id,
+                        "created_at": str(chat.created_at),
+                        "sender_id": chat.sender_id,
+                        "receiver_id": chat.receiver_id,
+                        "message": chat.message,
+                        "attachment": base_url+media_url if media_url else None,
+                    }
+                }
+            )
+
+            # Optionally, send confirmation back to sender
+            await self.send(text_data=json.dumps({
+                "status": 201,
+                "msg": "Message saved and sent to receiver",
+                "chat_id": chat.id,
+            }))
+
+        except Exception as e:
+            print(f"Receive error: {e}")
+            await self.send(text_data=json.dumps({
+                "error": {"error_code": 500, "error": "Internal server error"}
+            }))
 
     async def chat_message(self, event):
-        await self.send(text_data=json.dumps(event))
+        """Receive message from group and forward to WebSocket."""
+        await self.send(text_data=json.dumps(event['message']))
 
-    @sync_to_async
-    def save_message(self, sender_id, receiver_id, message, category_id, category_name, attachment_b64):
-        chat = Chat.objects.create(
-            sender_id=sender_id,
-            receiver_id=receiver_id,
-            message=message,
-            category_id=category_id,
-            category_name=category_name,
-            status="0",
+    @database_sync_to_async
+    def save_chat_message(self, data):
+        """Save message in DB, decode base64 attachment if provided."""
+        chat = Chat(
+            category_id=data['category_id'],
+            category_name=data['category_name'],
+            sender_id=data['sender_id'],
+            receiver_id=data['receiver_id'],
+            message=data['message'],
+            status='0'
         )
 
-        attachment_url = ""
+        attachment_b64 = data.get('attachment')
         if attachment_b64:
             try:
-                file_data = base64.b64decode(attachment_b64)
-                extension = "jpg"  # optionally detect using your existing `detect_file_type` function
-                filename = f"{uuid4().hex}.{extension}"
-                path = os.path.join(settings.MEDIA_ROOT, 'chat_attachments', filename)
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                with open(path, 'wb') as f:
-                    f.write(file_data)
+                # Validate base64 data
+                base64.b64decode(attachment_b64, validate=True)
                 chat.attachment = attachment_b64
-                chat.save()
-                attachment_url = f"{settings.MEDIA_URL}chat_attachments/{filename}"
             except Exception as e:
-                print("Attachment error:", e)
+                print(f"Attachment decoding failed: {e}")
+                # Optional: Raise error or ignore invalid attachment
+                raise
 
-        return chat.id, chat.created_at.strftime('%Y-%m-%d %I:%M %p'), attachment_url
+        chat.save()
+        return chat
+
+    @database_sync_to_async
+    def get_user_from_token(self, scope):
+        """Extract and validate token from headers in scope."""
+        try:
+            headers = dict(scope.get('headers', []))
+            auth_header = headers.get(b'authorization')
+
+            if auth_header:
+                auth_header_str = auth_header.decode()
+                if auth_header_str.startswith('Token '):
+                    token_key = auth_header_str.split(' ')[1]
+                    token = Token.objects.select_related('user').get(key=token_key)
+                    return token.user
+
+        except Exception as e:
+            print(f"Token authentication failed: {e}")
+        return AnonymousUser()

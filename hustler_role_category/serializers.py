@@ -74,6 +74,25 @@ class UpdateUsersCategorySerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+from rest_framework import serializers
+from .models import Chat
+
+class ChatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Chat
+        fields = [
+            'id',
+            'category_id',
+            'category_name',
+            'sender_id',
+            'receiver_id',
+            'message',
+            'status',
+            'attachment',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
+
 
 
 

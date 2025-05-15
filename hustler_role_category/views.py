@@ -15,7 +15,6 @@ from rest_framework.response import Response
 from django.core.exceptions import ObjectDoesNotExist
 
 from .models import UsersCategory
-from .models import UsersPosts
 from .models import Chat
 from users.models import Users
 from django.db.models import Q
@@ -610,43 +609,7 @@ def top_profiles(request):
     else:
         return Response({'status': 200, 'message': 'No profiles found', 'data': temp_list})
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-@authentication_classes([TokenAuthentication])
-@csrf_exempt
-def send_message(request):
-    data = request.data
-    if str(request.user.id) != str(data['sender_id']):
-        return Response({"error": {"error_code": 403, "error": "Permission denied."}}, status=403)
 
-    chat = Chat(
-        category_id=data['category_id'],
-        category_name=data['category_name'],
-        sender_id=data['sender_id'],
-        receiver_id=data['receiver_id'],
-        message=data['message'],
-        status='0'
-    )
-
-    attachment_b64 = data.get('attachment')
-    if attachment_b64:
-        try:
-            base64.b64decode(attachment_b64)
-            chat.attachment = attachment_b64
-        except Exception:
-            return None
-
-    chat.save()
-
-    # Optional: Send FCM notification here...
-
-    return Response({
-        "status": 201,
-        "msg": "Message sent successfully",
-        "chat_id": chat.id,
-        "created_at": chat.created_at
-    }, status=201)
- 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -671,6 +634,50 @@ def connect(request):
     return Response({'status': 200, 'msg': 'Connection request sent.'})
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def send_message(request):
+    data = request.data
+
+    print(f"Request data: {data}")  # Debugging the incoming data
+
+    if str(request.user.id) != str(data['sender_id']):
+        return Response({"error": {"error_code": 403, "error": "Permission denied."}}, status=403)
+
+    try:
+        chat = Chat(
+            category_id=data['category_id'],
+            category_name=data['category_name'],
+            sender_id=data['sender_id'],
+            receiver_id=data['receiver_id'],
+            message=data['message'],
+            status='0'
+        )
+
+        attachment_b64 = data.get('attachment')
+        if attachment_b64:
+            try:
+                base64.b64decode(attachment_b64)
+                chat.attachment = attachment_b64
+            except Exception as e:
+                print(f"Error decoding attachment: {e}")
+                return Response({"error": "Invalid attachment format"}, status=400)
+
+        chat.save()  # This is where the data should be saved
+
+        print(f"Message saved with ID: {chat.id}")  # Confirming the message has been saved
+
+        return Response({
+            "status": 201,
+            "msg": "Message sent successfully",
+            "chat_id": chat.id,
+            "created_at": chat.created_at
+        }, status=201)
+    except Exception as e:
+        print(f"Error saving message: {e}")  # If saving fails, log the error
+        return Response({"error": {"error_code": 500, "error": "Internal server error"}}, status=500)
 
 
 
