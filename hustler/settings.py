@@ -121,7 +121,15 @@ DEBUG = True
 # ALLOWED_HOSTS = ['https://hustlersandseekers.co/','hustlersandseekers.co', 'https://staging.hustlersandseekers.co/', 'staging.hustlersandseekers.co']
 
 #ALLOWED_HOSTS = ['82.25.86.49']
-ALLOWED_HOSTS = []
+#ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
+
+
+# Channels origin whitelist (optional, Channels 3+)
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost",
+    "http://127.0.0.1",
+]
 DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
 
@@ -146,6 +154,7 @@ INSTALLED_APPS = [
 
 
     'django.contrib.admin',
+     'csp',
 
 
 
@@ -210,13 +219,26 @@ INSTALLED_APPS = [
     'wallet_resume',
     
      'connect',
-
+     'channels',
     # 'fcm_django',
    
     'news',
     'hustler_role_category',
 
 ]
+
+ASGI_APPLICATION = 'hustler.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
+}
+
+
 
 
 FCM_DJANGO_SETTINGS = {
@@ -230,7 +252,18 @@ FCM_DJANGO_SETTINGS = {
 
 MIDDLEWARE = [
 
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 
     'django.middleware.security.SecurityMiddleware',
 
@@ -263,8 +296,7 @@ MIDDLEWARE = [
 ]
 
 
-
-
+CORS_ALLOW_ALL_ORIGINS = True 
 
 
 
@@ -374,14 +406,7 @@ WSGI_APPLICATION = 'hustler.wsgi.application'
 
 
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
-    },
-}
+
 
 
 

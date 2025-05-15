@@ -94,12 +94,6 @@ class UsersCategory(models.Model):
         return f"{self.user_id} - {self.role_category_name}"
 
 
-class UsersPosts(models.Model):
-
-	user_id=models.CharField(max_length=100, null=True, blank=True)
-	summary=models.CharField(max_length=500, null=True, blank=True)
-	video=models.FileField(upload_to="users/posts/", null=True, blank=True)
-	created_at = models.DateTimeField(auto_now_add=True)
 
 class Chat(models.Model):
     category_id = models.CharField(max_length=100, null=True, blank=True)
@@ -108,7 +102,7 @@ class Chat(models.Model):
     receiver_id = models.CharField(max_length=100, null=True, blank=True)
     message = models.CharField(max_length=500, null=True, blank=True)
     status = models.CharField(max_length=500, null=True, blank=True)
-    attachment = models.TextField(null=True, blank=True)  # Base64 attachment field
+    attachment = models.TextField(null=True, blank=True)  
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
