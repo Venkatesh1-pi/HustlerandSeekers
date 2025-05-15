@@ -135,7 +135,8 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
 
 
 
-# CORS_ALLOW_ALL_ORIGINS = True  # For testing only. Restrict in production.
+CORS_ALLOW_ALL_ORIGINS = True  
+# For testing only. Restrict in production.
 # CSRF_TRUSTED_ORIGINS = ['127.0.0.1:8000']
 
 
@@ -230,13 +231,15 @@ INSTALLED_APPS = [
 ASGI_APPLICATION = 'hustler.asgi.application'
 
 CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('127.0.0.1', 6379)],
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+            # "password": "YourStrongPasswordHere",  # If you set one
         },
     },
 }
+
 
 
 

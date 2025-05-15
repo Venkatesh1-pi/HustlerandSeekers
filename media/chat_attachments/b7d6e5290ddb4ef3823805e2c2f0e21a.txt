@@ -5,7 +5,7 @@ git init
 git add .
 
 # 3. Commit your code
-git commit -m "chat added"
+git commit -m "full image path  added in shooweuser"
 
 # 4. Add your Git remote (replace URL with your Git server repo)
 git remote add origin https://github.com/Venkatesh1-pi/HustlerandSeekers.git
@@ -24,13 +24,16 @@ passcode_vps:cn;&aJy00;v*nMWJMv!2
 
 #------------------------------------------------
 rm -rf HustlerandSeekers
-virtualenv venv
+
 source venv/bin/activate
-pip install djangorestframework-simplejwt django requests numpy geopy xmltodict pillow bs4 fcm_django daphne django-cors-headers django-csp channels
+
 python manage.py migrate
 pip install gunicorn
 sudo nano /etc/systemd/system/HustlerandSeekers.gunicorn.socket
 sudo nano /etc/systemd/system/HustlerandSeekers.gunicorn.service
+
+sudo nano /etc/systemd/system/hustler.service
+
 sudo systemctl start HustlerandSeekers.gunicorn.socket
 sudo systemctl start HustlerandSeekers.gunicorn.service
 sudo systemctl enable HustlerandSeekers.gunicorn.socket
@@ -42,8 +45,4 @@ sudo ln -s /etc/nginx/sites-available/HustlerandSeekers
 
 sudo nginx -t
 sudo service nginx restart
-
-uvicorn your_project.asgi:application --uds /tmp/uvicorn.sock
-
-
 
