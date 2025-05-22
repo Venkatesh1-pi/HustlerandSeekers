@@ -9,8 +9,6 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import get_user_model
 from hustler_role_category.models import Chat
 from django.conf import settings
-from django.db.models import Q
-import binascii
 
 User = get_user_model()
 base_url = "http://82.25.86.49"
@@ -52,43 +50,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data):
         try:
             data = json.loads(text_data)
-            sender_id = str(data.get('sender_id'))
 
+            sender_id = str(data.get('sender_id'))
             if str(self.user.id) != sender_id:
-                await self.send(text_data=json.dumps({
-                    "error": {"error_code": 403, "error": "Permission denied."}
+                await self.send(json.dumps({
+                    "type": "error",
+                    "error_code": 403,
+                    "error": "Permission denied."
                 }))
                 return
 
             chat = await self.save_chat_message(data)
-            receiver_room = f'chat_{chat.receiver_id}'
-            media_url = ""
 
+            media_url = None
             if chat.attachment:
-                try:
-                    decoded_file = base64.b64decode(chat.attachment)
-                    extension = detect_file_type(decoded_file)
-                    file_name = f"{uuid4().hex}.{extension}"
-                    media_path = os.path.join(settings.MEDIA_ROOT, 'chat_attachments', file_name)
-                    os.makedirs(os.path.dirname(media_path), exist_ok=True)
-                    with open(media_path, 'wb') as f:
-                        f.write(decoded_file)
-                    media_url = os.path.join(settings.MEDIA_URL, 'chat_attachments', file_name)
-                except Exception as e:
-                    print(f"Attachment processing failed: {e}")
-
-            old_messages = await self.get_old_messages(chat.category_id, chat.sender_id, chat.receiver_id)
+                media_url = base_url + settings.MEDIA_URL + chat.attachment
 
             response_data = {
+                "type": "chat_message",
                 "chat_id": chat.id,
-                "created_at": str(chat.created_at),
+                "created_at": chat.created_at.isoformat(),
                 "sender_id": chat.sender_id,
                 "receiver_id": chat.receiver_id,
                 "message": chat.message,
-                "attachment": base_url + media_url if media_url else None,
-                "previous_messages": old_messages,
+                "attachment_url": media_url,
             }
 
+            receiver_room = f'chat_{chat.receiver_id}'
             await self.channel_layer.group_send(
                 receiver_room,
                 {
@@ -97,20 +85,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
-            await self.send(text_data=json.dumps({
-                "status": 201,
-                "msg": "Message saved and sent to receiver",
-                "chat": response_data
-            }))
+            # Echo the same message back to sender
+            await self.send(json.dumps(response_data))
 
         except Exception as e:
             print(f"Receive error: {e}")
-            await self.send(text_data=json.dumps({
-                "error": {"error_code": 500, "error": "Internal server error"}
+            await self.send(json.dumps({
+                "type": "error",
+                "error_code": 500,
+                "error": "Internal server error"
             }))
 
     async def chat_message(self, event):
-        await self.send(text_data=json.dumps(event['message']))
+        await self.send(json.dumps(event['message']))
 
     @database_sync_to_async
     def save_chat_message(self, data):
@@ -124,8 +111,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
         if data.get('attachment'):
             try:
-                base64.b64decode(data['attachment'], validate=True)
-                chat.attachment = data['attachment']
+                decoded_file = base64.b64decode(data['attachment'])
+                extension = detect_file_type(decoded_file)
+                file_name = f"{uuid4().hex}.{extension}"
+                media_path = os.path.join(settings.MEDIA_ROOT, 'chat_attachments', file_name)
+                os.makedirs(os.path.dirname(media_path), exist_ok=True)
+                with open(media_path, 'wb') as f:
+                    f.write(decoded_file)
+                chat.attachment = f'chat_attachments/{file_name}'
             except Exception as e:
                 print(f"Attachment decoding failed: {e}")
                 raise
@@ -146,37 +139,3 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             print(f"Token authentication failed: {e}")
         return AnonymousUser()
-
-    @database_sync_to_async
-    def get_old_messages(self, category_id, sender_id, receiver_id):
-        messages = Chat.objects.filter(
-            category_id=category_id
-        ).filter(
-            Q(sender_id=sender_id, receiver_id=receiver_id) |
-            Q(sender_id=receiver_id, receiver_id=sender_id)
-        ).order_by('-created_at')[:10]
-
-        result = []
-        for m in reversed(messages):
-            media_url = ""
-            if m.attachment:
-                try:
-                    decoded_file = base64.b64decode(m.attachment)
-                    extension = detect_file_type(decoded_file)
-                    file_name = f"{uuid4().hex}.{extension}"
-                    media_path = os.path.join(settings.MEDIA_ROOT, 'chat_attachments', file_name)
-                    os.makedirs(os.path.dirname(media_path), exist_ok=True)
-                    with open(media_path, 'wb') as f:
-                        f.write(decoded_file)
-                    media_url = os.path.join(settings.MEDIA_URL, 'chat_attachments', file_name)
-                except Exception as e:
-                    print(f"Attachment decoding failed (old msg): {e}")
-            result.append({
-                "chat_id": m.id,
-                "created_at": str(m.created_at),
-                "sender_id": m.sender_id,
-                "receiver_id": m.receiver_id,
-                "message": m.message,
-                "attachment": base_url + media_url if media_url else None,
-            })
-        return result

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WebSocket Chat Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; }
+    label { display: block; margin-top: 0.5rem; }
+    input, textarea { width: 100%; box-sizing: border-box; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; }
+    #messages { background:#eee; padding:10px; height:300px; overflow:auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>WebSocket Chat Test</h2>
+
+  <div>
+    <label>
+      Token:
+      <input type="text" id="token" size="50" 
+        value="804fea30d7905fb2213e76cb8c120f5e9bf6bfac" />
+    </label>
+    <button onclick="connectWS()">Connect</button>
+  </div>
+
+  <div id="status" style="margin-top:10px;">Status: Not connected</div>
+
+  <hr>
+
+  <div>
+    <label>Category ID: <input type="text" id="category_id" value="1" /></label>
+    <label>Category Name: <input type="text" id="category_name" value="worker" /></label>
+    <label>Sender ID: <input type="text" id="sender_id" value="1" /></label>
+    <label>Receiver ID: <input type="text" id="receiver_id" value="2" /></label>
+    <label>Message:</label>
+    <textarea id="message" rows="3">hey hi</textarea>
+    <button onclick="sendMessage()">Send Message</button>
+  </div>
+
+  <hr />
+
+  <h3>Messages</h3>
+  <pre id="messages"></pre>
+
+  <script>
+    let socket = null;
+
+    function log(msg) {
+      const messages = document.getElementById('messages');
+      messages.textContent += msg + '\n';
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function connectWS() {
+      const token = document.getElementById('token').value.trim();
+      if (!token) {
+        alert('Please enter a token');
+        return;
+      }
+
+      // Change this if your backend host or port is different
+      const wsHost = '127.0.0.1:8000';
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      // Hardcoded user ID 2 in URL (change if needed)
+      const userId = 2;
+
+      const wsUrl = `${wsProtocol}://${wsHost}/ws/chat/${userId}/?token=${token}`;
+
+      if (socket !== null) {
+        socket.close();
+        socket = null;
+      }
+
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        document.getElementById('status').textContent = 'Status: Connected';
+        log('[Connected]');
+      };
+
+      socket.onmessage = (event) => {
+        log('[Received] ' + event.data);
+      };
+
+      socket.onclose = (event) => {
+        document.getElementById('status').textContent = 'Status: Disconnected';
+        log('[Disconnected]');
+        socket = null;
+      };
+
+      socket.onerror = (error) => {
+        log('[Error] WebSocket error');
+      };
+    }
+
+    function sendMessage() {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        alert('WebSocket is not connected');
+        return;
+      }
+
+      const payload = {
+        category_id: document.getElementById('category_id').value.trim(),
+        category_name: document.getElementById('category_name').value.trim(),
+        sender_id: document.getElementById('sender_id').value.trim(),
+        receiver_id: document.getElementById('receiver_id').value.trim(),
+        message: document.getElementById('message').value.trim(),
+        attachment: ""  // Base64 string or empty
+      };
+
+      socket.send(JSON.stringify(payload));
+      log('[Sent] ' + JSON.stringify(payload));
+    }
+  </script>
+</body>
+</html>
