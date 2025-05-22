@@ -126,10 +126,10 @@ ALLOWED_HOSTS = ["*"]
 
 
 # Channels origin whitelist (optional, Channels 3+)
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost",
-    "http://127.0.0.1",
-]
+# CSRF_TRUSTED_ORIGINS = [
+#     "http://localhost",
+#     "http://127.0.0.1",
+# ]
 DATA_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 104857600  # 100 MB
 
@@ -235,10 +235,14 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
             "hosts": [("127.0.0.1", 6379)],
-            # "password": "YourStrongPasswordHere",  # If you set one
         },
     },
 }
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels.layers.InMemoryChannelLayer",
+#     },
+# }
 
 
 

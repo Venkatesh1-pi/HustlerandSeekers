@@ -73,7 +73,7 @@ from rest_framework.authentication import TokenAuthentication
 from django.views.decorators.csrf import csrf_exempt
 
 from .serializers import UsersCategorySerializer
-from .models import UsersCategory  
+from .models import UsersCategory
 
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
@@ -145,7 +145,7 @@ from django.conf import settings
 @csrf_exempt
 def update_category(request):
     base_url = 'http://82.25.86.49'
-    user_id = request.data.get('user_id') 
+    user_id = request.data.get('user_id')
     category_id=request.data.get('id')
     category_name=request.data.get('role_category_name')
     if str(request.user.id) != str(user_id):
@@ -154,15 +154,15 @@ def update_category(request):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-  
+
     category_instance = UsersCategory.objects.filter(user_id=user_id,id=category_id).first()
     if not category_instance:
-        return Response({"error": {"error_code": 409, "error": "userid or catgeory id or catgeory name doesnt match with database"}}, 
+        return Response({"error": {"error_code": 409, "error": "userid or catgeory id or catgeory name doesnt match with database"}},
                             status=status.HTTP_409_CONFLICT)
     print(category_instance)
- 
+
     serializer = UpdateUsersCategorySerializer(instance=category_instance, data=request.data)
-   
+
     if serializer.is_valid():
         serializer.save()
 
@@ -188,10 +188,10 @@ def update_category(request):
                 return f'hustler_images/{image_name}'
 
             except (binascii.Error, ValueError) as e:
-               
+
                 return None
 
-            
+
 
 
         def save_base64_video(base64_data, video_name):
@@ -231,9 +231,9 @@ def update_category(request):
         print(f"Last 100 chars: {category_instance.image2[-100:]}")
 
 
-        image1 = save_base64_image(category_instance.image1, f'{user_id}_{category_name}_image1.jpg') if category_instance.image1 else None 
+        image1 = save_base64_image(category_instance.image1, f'{user_id}_{category_name}_image1.jpg') if category_instance.image1 else None
         image2 = save_base64_image(category_instance.image2, f'{user_id}_{category_name}_image2.jpg') if category_instance.image2 else None
-        image3 = save_base64_image(category_instance.image3, f'{user_id}_{category_name}_image3.jpg') if category_instance.image3 else None  
+        image3 = save_base64_image(category_instance.image3, f'{user_id}_{category_name}_image3.jpg') if category_instance.image3 else None
         video = save_base64_video(category_instance.video, f'{user_id}_{category_name}_video.mp4') if category_instance.video else None
 
         image1_url = f'{base_url}{settings.MEDIA_URL}{image1}' if image1 else None
@@ -308,7 +308,7 @@ def save_base64_image(base64_data, image_name):
     except:
         return None
 
-    
+
 
 
 # Function to save base64 video
@@ -342,7 +342,7 @@ def save_base64_video(base64_data, video_name):
     except:
        return None
 
-    
+
 
 
 from users.models import Users
@@ -419,7 +419,7 @@ def role_category(request):
         'base_url': base_url,
         'payload': profiles,
         'all_category':allCategory,
-       
+
     })
 @api_view(['POST'])
 @permission_classes((IsAuthenticated,))
@@ -506,8 +506,8 @@ def save_base64_image2(base64_data, image_name):
     except:
             return None
 
-   
-   
+
+
 
 
 @api_view(['POST'])
@@ -549,7 +549,7 @@ def top_profiles(request):
     for profile in profiles:
         userData = Users.objects.filter(id = profile['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'name' ,'location', 'banner_image', 'latitude', 'longitude')
         name=""
-            
+
         if userData:
             userData = userData[0]
 
@@ -681,155 +681,120 @@ def send_message(request):
 
 
 
-import os
+
+
+
+from collections import defaultdict
+def fix_base64_padding(b64_string):
+    return b64_string + '=' * (-len(b64_string) % 4)
+
 import base64
 from uuid import uuid4
-from django.conf import settings
-import binascii
 
-# Magic byte sequences for supported file types
-FILE_SIGNATURES = {
-    'jpg': b'\xFF\xD8\xFF',  # JPEG
-    'png': b'\x89\x50\x4E\x47',  # PNG
-    'gif': b'\x47\x49\x46\x38',  # GIF
-    'mp4': b'\x00\x00\x00\x18\x66\x74\x79\x70\x33\x67\x70\x35',  # MP4
-    'avi': b'\x52\x49\x46\x46',  # AVI
-    'pdf': b'\x25\x50\x44\x46',  # PDF
-    'doc': b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1',  # DOC
-    'docx': b'\x50\x4B\x03\x04',  # DOCX (ZIP header)
-    'ppt': b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1',  # PPT
-    'pptx': b'\x50\x4B\x03\x04',  # PPTX (ZIP header)
-}
-
-def detect_file_type(file_bytes):
-    """
-    Detect the file type based on magic bytes.
-    Returns the file extension if detected, otherwise returns None.
-    """
-    # Log the first few bytes of the file for debugging purposes
-    print(f"First few bytes of file: {binascii.hexlify(file_bytes[:20])}")
-
-    for ext, signature in FILE_SIGNATURES.items():
-        if file_bytes.startswith(signature):
-            return ext
-    return 'txt' # Return None if not a supported file type
-
-
-
-from users.models import Users
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @authentication_classes([TokenAuthentication])
-@csrf_exempt
 def messages(request):
-   
+    base_url = "http://82.25.86.49"  # Ideally from settings
+    user_id = int(request.data.get('user_id'))
+    if str(request.user.id) != str(request.data.get('user_id')):
+        return Response(
+            {"error": {"error_code": 403, "error": "Permission denied: You cannot fetch another user data"}},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    all_chats = Chat.objects.filter(
+        Q(sender_id=user_id) | Q(receiver_id=user_id)
+    ).order_by('-created_at')
 
-    base_url = "http://82.25.86.49"  # Replace with your actual base URL or import from settings
-    user_id = request.data.get('user_id')
-
-    all_chats = Chat.objects.filter(Q(sender_id=user_id) | Q(receiver_id=user_id)).values('category_id', 'category_name', 'id')
-    seen_categories = set()
-    messages_data = []
+    grouped = {}
 
     for chat in all_chats:
-        key = (chat['category_id'], chat['category_name'])
-        if key not in seen_categories:
-            seen_categories.add(key)
-            messages_data.append(chat)
+        cat_id = chat.category_id
+        cat_name = chat.category_name
 
-    def detect_file_type(file_bytes):
-        FILE_SIGNATURES = {
-            'jpg': b'\xFF\xD8\xFF',
-            'png': b'\x89\x50\x4E\x47',
-            'gif': b'\x47\x49\x46\x38',
-            'mp4': b'\x00\x00\x00\x18\x66\x74\x79\x70\x33\x67\x70\x35',
-            'avi': b'\x52\x49\x46\x46',
-            'pdf': b'\x25\x50\x44\x46',
-            'doc': b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1',
-            'docx': b'\x50\x4B\x03\x04',
-            'ppt': b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1',
-            'pptx': b'\x50\x4B\x03\x04',
-        }
-        for ext, signature in FILE_SIGNATURES.items():
-            if file_bytes.startswith(signature):
-                return ext
-        return 'txt'
+        if str(chat.sender_id) == str(user_id):
+            other_user_id = chat.receiver_id
+        else:
+            other_user_id = chat.sender_id
 
-    temp_list = []
+        if cat_id not in grouped:
+            grouped[cat_id] = {
+                "id": chat.id,
+                "user_id": user_id,
+                "category_id": cat_id,
+                "category_name": cat_name,
+                "inbox": {}
+            }
 
-    for i in messages_data:
-        temp_dict = {
-            'id': i['id'],
-            'user_id': user_id,
-            'category_id': i['category_id'],
-            'category_name': i['category_name'],
-            'inbox': []
-        }
-
-        messagess = Chat.objects.filter(category_name=i['category_name']) \
-            .filter(Q(sender_id=user_id) | Q(receiver_id=user_id)).order_by('-created_at')
-
-        seen_pairs = set()
-
-        for messag in messagess:
-            pair = tuple(sorted([messag.sender_id, messag.receiver_id]))
-            if pair in seen_pairs:
-                continue
-            seen_pairs.add(pair)
-
-            other_user_id = messag.receiver_id if messag.sender_id == int(user_id) else messag.sender_id
+        if other_user_id not in grouped[cat_id]["inbox"]:
             userData = Users.objects.filter(id=other_user_id).values(
                 'id', 'username', 'email', 'phone', 'image', 'gender', 'dob',
                 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude'
             ).first()
 
-            def save_base64_image(base64_data, filename):
-                try:
-                    decoded_image = base64.b64decode(base64_data)
-                    image_path = os.path.join('profile_images', filename)
-                    full_path = os.path.join(settings.MEDIA_ROOT, image_path)
-                    os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                    with open(full_path, 'wb') as f:
-                        f.write(decoded_image)
-                    return image_path
-                except Exception as e:
-                    print(f"Image decode error: {e}")
-                    return None
+            if userData:
+                if userData['dob']:
+                    userData['dob'] = userData['dob'].strftime('%Y-%m-%d') if hasattr(userData['dob'], 'strftime') else userData['dob']
 
-            image_path = save_base64_image(userData['image'], f"{userData['id']}_profile.jpg") if userData.get('image') else None
-            banner_path = save_base64_image(userData['banner_image'], f"{userData['id']}_banner.jpg") if userData.get('banner_image') else None
+                # Attachment handling
+                attachment_path = None
+                if chat.attachment:
+                    try:
+                        fixed_base64 = fix_base64_padding(chat.attachment.strip())
+                        file_data = base64.b64decode(fixed_base64)
+                        file_ext = detect_file_type(file_data)
+                        file_name = f"{uuid4()}.{file_ext}"
+                        save_dir = os.path.join(settings.MEDIA_ROOT, 'chat_attachments')
+                        os.makedirs(save_dir, exist_ok=True)
+                        full_path = os.path.join(save_dir, file_name)
 
-            userData['image'] = f"{base_url}{settings.MEDIA_URL}{image_path}" if image_path else None
-            userData['banner_image'] = f"{base_url}{settings.MEDIA_URL}{banner_path}" if banner_path else None
+                        with open(full_path, 'wb') as f:
+                            f.write(file_data)
 
-            media_url = ""
-            if messag.attachment:
-                try:
-                    decoded_file = base64.b64decode(messag.attachment)
-                    extension = detect_file_type(decoded_file)
-                    file_name = f"{uuid4().hex}.{extension}"
-                    media_path = os.path.join(settings.MEDIA_ROOT, 'chat_attachments', file_name)
-                    os.makedirs(os.path.dirname(media_path), exist_ok=True)
-                    with open(media_path, 'wb') as f:
-                        f.write(decoded_file)
-                    media_url = os.path.join(settings.MEDIA_URL, 'chat_attachments', file_name)
-                except Exception as e:
-                    print(f"Attachment processing failed: {e}")
+                        attachment_path = f"{base_url}/media/chat_attachments/{file_name}"
+                    except Exception as e:
+                        print(f"Attachment error: {e}")
+                        attachment_path = None
 
-            temp_dict2 = {
-                'id': messag.id,
-                'userData': userData,
-                'message': messag.message,
-                'attachment': request.build_absolute_uri(media_url) if media_url else None,
-                'status': messag.status,
-                'created_at': messag.created_at.strftime('%Y-%m-%d %I:%M %p'),
-            }
+                grouped[cat_id]["inbox"][other_user_id] = {
+                    "id": chat.id,
+                    "userData": userData,
+                    "message": chat.message,
+                    "attachment": attachment_path,
+                    "status": str(chat.status),
+                    "created_at": chat.created_at.strftime('%Y-%m-%d %I:%M %p') if chat.created_at else None,
+                }
 
-            temp_dict['inbox'].append(temp_dict2)
+    for cat in grouped.values():
+        cat["inbox"] = list(cat["inbox"].values())
 
-        temp_list.append(temp_dict)
+    return Response({
+        "status": 200,
+        "msg": "Messages",
+        "data": list(grouped.values())
+    })
 
-    return Response({'status': 200, 'msg': 'Messages.', 'data': temp_list})
+
+
+
+def detect_file_type(file_bytes):
+    FILE_SIGNATURES = {
+        'jpg': b'\xFF\xD8\xFF',
+        'png': b'\x89\x50\x4E\x47',
+        'gif': b'\x47\x49\x46\x38',
+        'mp4': b'\x00\x00\x00\x18\x66\x74\x79\x70\x33\x67\x70\x35',
+        'avi': b'\x52\x49\x46\x46',
+        'pdf': b'\x25\x50\x44\x46',
+        'doc': b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1',
+        'docx': b'\x50\x4B\x03\x04',
+        'ppt': b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1',
+        'pptx': b'\x50\x4B\x03\x04',
+    }
+    for ext, signature in FILE_SIGNATURES.items():
+        if file_bytes.startswith(signature):
+            return ext
+    return 'txt'
+
 
 
 
@@ -865,7 +830,7 @@ def messages_list(request):
             try:
                 # Decode the base64 string into raw bytes
                 decoded_file = base64.b64decode(i['attachment'])
-                
+
                 # Log the first few bytes of the decoded file
                 print(f"Decoded file first few bytes: {binascii.hexlify(decoded_file[:20])}")
 
@@ -894,7 +859,7 @@ def messages_list(request):
 
     return Response({'status': 200, 'msg': 'Messages.', 'data': temp_list})
 
-  
+
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
@@ -903,7 +868,7 @@ def messages_list(request):
 #     data = request.data
 #     latitude1 = int(float(data['latitude']))
 #     longitude1 = int(float(data['longitude']))
-    
+
 #     profile = ResumeWallet.objects.filter(user_id=data['user_id']).values('id', 'user_id', 'role_category_name').distinct('role_category_name')
 #     temp_list = []
 
@@ -916,7 +881,7 @@ def messages_list(request):
 
 #         if ResumeWallet.objects.filter(role_category_name=i['role_category_name'], user_id=data['user_id']).exists():
 #             bookmarks = ResumeWallet.objects.filter(user_id=data['user_id'], role_category_name=i['role_category_name']).values('id', 'user_id', 'role_category_id', 'role_category_name')
-            
+
 #             for bookmark in bookmarks:
 #                 userData = Users.objects.filter(id=bookmark['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
 #                 category = UsersCategory.objects.filter(id=bookmark['role_category_id']).values('id', 'user_id', 'role_category_name', 'summary', 'about_yourself', 'price', 'image1', 'image2', 'image3', 'video', 'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link', 'yt_link', 'other_link', 'is_primary')
@@ -940,10 +905,10 @@ def messages_list(request):
 #                 temp_dict2['linkedin_link'] = category['linkedin_link']
 #                 temp_dict2['yt_link'] = category['yt_link']
 #                 temp_dict2['other_link'] = category['other_link']
-#                 temp_dict2['is_primary'] = category['is_primary'] 
-                
+#                 temp_dict2['is_primary'] = category['is_primary']
+
 #                 temp_dict['bookmarks'].append(temp_dict2)
-        
+
 #         temp_list.append(temp_dict)
 
 #     return Response({'status': 200, 'msg': 'User category.', 'base_url': 'https://hustlersandseekers.co/hustler/media/', 'data': temp_list})
@@ -956,7 +921,7 @@ def messages_list(request):
 #     resumeWallet = ResumeWallet();
 #     if ResumeWallet.objects.filter(user_id = data['user_id'], role_category_id = data['role_category_id']).exists():
 #         ResumeWallet.objects.filter(user_id = data['user_id'], role_category_id = data['role_category_id']).delete()
-#         return Response({'status':200,'msg':'Removed from wallet.'})           
+#         return Response({'status':200,'msg':'Removed from wallet.'})
 #     else:
 #         category = UsersCategory.objects.filter(id = data['role_category_id']).values('id', 'role_category_name')
 #         resumeWallet.user_id = data['user_id']
@@ -966,7 +931,7 @@ def messages_list(request):
 #         return Response({'status':200, 'msg':'Added to your wallet.'})
 
 
-    
+
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
@@ -994,7 +959,7 @@ def messages_list(request):
 #     for entry in combined_data:
 #         # Fetch user data for the entry
 #         user_data = Users.objects.filter(id=entry['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
-        
+
 #         if user_data:
 #             userData = user_data[0]
 #             if userData['latitude']:
@@ -1002,9 +967,9 @@ def messages_list(request):
 #                 longitude2 = int(float(userData['longitude']))
 #                 distance = haversine(latitude1, longitude1, latitude2, longitude2)
 #             else:
-#                distance = 0     
+#                distance = 0
 #         else:
-#             distance = 0    
+#             distance = 0
 #         if distance < 20:
 #             temp_dict = {}
 #             temp_dict['id'] = entry['id']
@@ -1016,7 +981,7 @@ def messages_list(request):
 
 #             temp_list.append(temp_dict)
 
-#     return Response({'status': 200, 'message': 'Top videos', 'data': temp_list})        
+#     return Response({'status': 200, 'message': 'Top videos', 'data': temp_list})
 
 
 # @api_view(['POST'])
@@ -1026,7 +991,7 @@ def messages_list(request):
 #     data = request.data
 #     review = Review();
 #     if Review.objects.filter(user_id = data['user_id'], hustler_id = data['hustler_id'], role_id = data['role_id']).exists():
-#         return Response({'status':400,'msg':'Already Reviewed.'})           
+#         return Response({'status':400,'msg':'Already Reviewed.'})
 #     else:
 #         review.user_id = data['user_id']
 #         review.hustler_id = data['hustler_id']
@@ -1034,7 +999,7 @@ def messages_list(request):
 #         review.review = data['review']
 #         review.rating = data['rating']
 #         review.save()
-#         return Response({'status':200, 'msg':'success.'})    
+#         return Response({'status':200, 'msg':'success.'})
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
@@ -1057,7 +1022,7 @@ def messages_list(request):
 #         temp_dict['review'] = i['review']
 #         temp_dict['rating'] = i['rating']
 #         temp_list.append(temp_dict)
-#     return Response({'status': 200, 'message': 'Top Reviews', 'data': temp_list}) 
+#     return Response({'status': 200, 'message': 'Top Reviews', 'data': temp_list})
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
@@ -1066,7 +1031,7 @@ def messages_list(request):
 #     data = request.data
 #     profile = Notifications.objects.filter(user_id = data['user_id']).values('id', 'user_id', 'hustler_id', 'notification', 'role_category_id', 'seeker_notification', 'notifica_type', 'status', 'created_at')
 #     profile2 = Notifications.objects.filter(hustler_id = data['user_id']).values('id', 'user_id', 'hustler_id', 'notification', 'role_category_id', 'seeker_notification', 'notifica_type', 'status', 'created_at')
-    
+
 #     temp_list = []
 #     for i in profile:
 #         userData = Users.objects.filter(id = i['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
@@ -1099,22 +1064,22 @@ def messages_list(request):
 #         temp_dict2['notifica_type'] = i2['notifica_type']
 #         temp_dict2['status'] = i2['status']
 #         temp_dict2['created_at'] = i2['created_at'].strftime('%Y-%m-%d %I:%M %p')
-#         temp_list2.append(temp_dict2) 
-   
-#     return Response({'status': 200, 'message': 'Notifications', 'hustlers': temp_list2, 'seekers': temp_list}) 
+#         temp_list2.append(temp_dict2)
+
+#     return Response({'status': 200, 'message': 'Notifications', 'hustlers': temp_list2, 'seekers': temp_list})
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
 # @csrf_exempt
 # def update_connect_status(request):
 #     data = request.data
-    
+
 
 #     if Notifications.objects.filter(id=data['notification_id']).exists():
 #         noti_obj = Notifications.objects.filter(id = data['notification_id'])[0]
 #         noti_obj.status = data['status']
 #         noti_obj.save()
-        
+
 #         userData = Users.objects.filter(id=noti_obj.user_id).values('device_token').first()
 #         hustlerData = Users.objects.filter(id=noti_obj.hustler_id).values('device_token').first()
 
@@ -1150,12 +1115,12 @@ def messages_list(request):
 #             }
 
 #             # Send the POST request with the payload and headers
-#             response = requests.post(url, headers=headers, data=payload)  
+#             response = requests.post(url, headers=headers, data=payload)
 #         else:
-            
+
 #             return Response({'status': 200, 'msg': 'Notification id not correct'})
 
-        
+
 
 #         if data['type'] == "connect":
 
@@ -1169,7 +1134,7 @@ def messages_list(request):
 #                 Connect.objects.filter(id = noti_obj.connect_id).delete()
 #                 return Response({'status': 200, 'msg': 'Request Rejected'})
 #         else:
-            
+
 #             if data['status'] == 'Accepted':
 #                 conn_obj1 = Appointments.objects.filter(id = noti_obj.connect_id)[0]
 #                 conn_obj1.status = 'Accepted'
@@ -1181,9 +1146,9 @@ def messages_list(request):
 #                 # Connect.objects.filter(id = noti_obj.connect_id).delete()
 #                 return Response({'status': 200, 'msg': 'Request Rejected'})
 
-              
+
 #     else:
-        
+
 #         return Response({'status': 400, 'msg': 'Notification id not correct.'})
 
 # @api_view(['POST'])
@@ -1199,9 +1164,9 @@ def messages_list(request):
 #         noti_objs['username'] = hustlerDataa['username']
 #         noti_objs['image'] = hustlerDataa['image']
 #         noti_objs['location'] = hustlerDataa['location']
-#         return Response({'status': 200, 'msg': 'hustler links', 'data':noti_objs})   
+#         return Response({'status': 200, 'msg': 'hustler links', 'data':noti_objs})
 #     else:
-        
+
 #         return Response({'status': 400, 'msg': 'Something went wrong.'})
 
 # @api_view(['POST'])
@@ -1211,19 +1176,19 @@ def messages_list(request):
 #     data = request.data
 #     Appointment = Appointments();
 #     if Appointments.objects.filter(user_id = data['user_id'], hustler_id = data['hustler_id'], role_id = data['role_id'], date = data['date'], start_time = data['start_time'], end_time = data['end_time']).exists():
-#         return Response({'status':400,'msg':'Already have booking on this slot Please choose other slot.'})           
+#         return Response({'status':400,'msg':'Already have booking on this slot Please choose other slot.'})
 #     else:
 #         userData = Users.objects.filter(id = data['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'device_token', 'latitude', 'longitude')
 #         hustlerData = Users.objects.filter(id = data['hustler_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'device_token', 'latitude', 'longitude')
 #         if userData:
 #             userDataa = userData[0]
 #         else:
-#             userDataa = userData    
+#             userDataa = userData
 #         if hustlerData:
 #             hustlerDataa = hustlerData[0]
 #         else:
-#             hustlerDataa = hustlerData   
-              
+#             hustlerDataa = hustlerData
+
 #         Appointment.user_id = data['user_id']
 #         Appointment.hustler_id = data['hustler_id']
 #         Appointment.role_id = data['role_id']
@@ -1239,7 +1204,7 @@ def messages_list(request):
 
 #         notification_message = userDataa['username'] + ' has requested to you for appointment.'
 #         seeker_notification_message = 'You have successfully requested an appointment with '+hustlerDataa['username']
-        
+
 #         url = "https://fcm.googleapis.com/fcm/send"
 
 #         # Define the data to be sent in the notification
@@ -1288,7 +1253,7 @@ def messages_list(request):
 #         if Notifications.objects.filter(id=data['notification_id']).exists():
 #             noti_obj = Notifications.objects.filter(id = data['notification_id'])[0]
 #             noti_obj.status = 'Booked'
-#             noti_obj.save()  
+#             noti_obj.save()
 #         else:
 #             return Response({'status': 400, 'msg': 'Something went wrong.'})
 #         return Response({'status':200, 'msg':'Appointment booked successfully.'})
@@ -1320,7 +1285,7 @@ def messages_list(request):
 #         temp_dict['created_at'] = i['created_at'].strftime('%Y-%m-%d %I:%M %p')
 #         temp_dict['updated_at'] = i['updated_at'].strftime('%Y-%m-%d %I:%M %p')
 #         temp_list.append(temp_dict)
-#     return Response({'status': 200, 'message': 'All Appointments', 'data': temp_list}) 
+#     return Response({'status': 200, 'message': 'All Appointments', 'data': temp_list})
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
@@ -1340,7 +1305,7 @@ def messages_list(request):
 #         if datetime.strptime(formatted_time, '%H:%M:%S').time() > current_time:
 
 #             if Appointments.objects.filter(hustler_id=data['hustler_id'], date=data['date'], start_time=formatted_time).exists():
-            
+
 #                 temp_dict = {
 #                     'start_times': formatted_time,
 #                     'end_time': next_hour_formatted_time,
@@ -1354,7 +1319,7 @@ def messages_list(request):
 #                 }
 #             temp_list.append(temp_dict)
 
-#     return JsonResponse({'status': 200, 'message': 'All slots', 'data': temp_list})   
+#     return JsonResponse({'status': 200, 'message': 'All slots', 'data': temp_list})
 
 # @api_view(['POST'])
 
@@ -1415,7 +1380,7 @@ def messages_list(request):
 #     UsersPost.summary = data['text']
 #     UsersPost.video = data['file']
 #     UsersPost.save()
-#     return Response({'status':200, 'msg':'Posted successfully.'})  
+#     return Response({'status':200, 'msg':'Posted successfully.'})
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
@@ -1428,7 +1393,7 @@ def messages_list(request):
 
 #     distance = haversine(latitude1, longitude1, latitude2, longitude2)
 #     mess = "Distance between Berlin and Paris:", distance, "miles"
-#     return Response({'status':200, 'msg':mess})    
+#     return Response({'status':200, 'msg':mess})
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
@@ -1479,6 +1444,5 @@ def messages_list(request):
 
 #     # Send the POST request with the payload and headers
 #     response = requests.post(url, headers=headers, data=payload)
-#     return Response({'status': 200, 'msg': 'message sent.'})         
-
+#     return Response({'status': 200, 'msg': 'message sent.'})
 

@@ -5,7 +5,7 @@ git init
 git add .
 
 # 3. Commit your code
-git commit -m "chat added"
+git commit -m "chat updated"
 
 # 4. Add your Git remote (replace URL with your Git server repo)
 git remote add origin https://github.com/Venkatesh1-pi/HustlerandSeekers.git
@@ -43,7 +43,12 @@ sudo ln -s /etc/nginx/sites-available/HustlerandSeekers
 sudo nginx -t
 sudo service nginx restart
 
-uvicorn your_project.asgi:application --uds /tmp/uvicorn.sock
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl start daphne
+sudo systemctl enable daphne
 
-
+sudo journalctl -u gunicorn.service -f
+sudo tail -f /var/log/nginx/error.log
+daphne hustler.asgi:application
 
