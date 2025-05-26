@@ -22,7 +22,7 @@ from wallet_resume.models import ResumeWallet
 from connect.models import Connect
 # from connect.models import Review
 from connect.models import Notifications
-# from connect.models import Appointments
+from connect.models import Appointments
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -537,12 +537,14 @@ def top_profiles(request):
                 'yt_link', 'other_link', 'is_primary'
             )
     else:
-        profiles = UsersCategory.objects.all().values(
-            'id', 'user_id', 'role_category_name', 'summary', 'about_yourself',
-            'price', 'latitude', 'longitude', 'image1', 'image2', 'image3', 'video',
-            'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link',
-            'yt_link', 'other_link', 'is_primary'
-        )
+        profiles = UsersCategory.objects.filter(
+                ~Q(user_id=data['user_id'])
+            ).values(
+                'id', 'user_id', 'role_category_name', 'summary', 'about_yourself',
+                'price', 'latitude', 'longitude', 'image1', 'image2', 'image3', 'video',
+                'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link',
+                'yt_link', 'other_link', 'is_primary'
+            )
 
     temp_list = []
 
@@ -860,6 +862,181 @@ def messages_list(request):
     return Response({'status': 200, 'msg': 'Messages.', 'data': temp_list})
 
 
+#-------------------------------------------------------------------Notifications----------------------------------------------------------------------------#
+
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def send_notification(request):
+    url = "https://fcm.googleapis.com/fcm/send"
+
+    # Define the data to be sent in the notification
+    data = {
+        "to": "fW-Ubcj2TbKmfMy-GFeqIE:APA91bHmzVqYLHelGQHtTC_4iHrRlUxkqOe3YYU0vp_Xlm4UQS5VO26Fi_lAWrFpgj7zVIfPvnxk7o4LnX7tkYeuBmt833UaEkPBpxXLBWWRPePWfP5FcFi3ExeSgNyZa-LjbbFGC-md",
+        "notification": {
+            "body": "New announcement assigned",
+            "priority": "high",
+            "message_id": '1',
+            "title": "hello",
+            "sound": "app_sound.wav",
+        },
+        "data": {
+            "priority": "high",
+            "message_id": '1',
+            "title": "hello",
+            "body": "New announcement assignedaaaa",
+            "sound": "app_sound.wav",
+            "content_available": True
+        }
+    }
+
+    # Convert the data dictionary to a JSON string
+    payload = json.dumps(data)
+
+    # Define the headers
+    headers = {
+        'Authorization': 'key=AAAAMmfUttw:APA91bFl7CTYHRar2M4KAY_GskDEfApLqawNehtyL7_vjNWsF476TAwT1a3Rf5PNkS2F9D6tTUzC8cShbvRYukWU5STpEkeiiIld0Yd8OnBQLL8heqfYfOeNqjCYJxnh_LNhCwmlx-4P',
+        'Content-Type': 'application/json'
+    }
+
+    # Send the POST request with the payload and headers
+    response = requests.post(url, headers=headers, data=payload)
+
+    # Return the response
+    return Response({'status':200,'msg':'sent'})
+
+
+
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def notifications(request):
+    data = request.data
+    profile = Notifications.objects.filter(user_id = data['user_id']).values('id', 'user_id', 'hustler_id', 'notification', 'role_category_id', 'seeker_notification', 'notifica_type', 'status', 'created_at')
+    profile2 = Notifications.objects.filter(hustler_id = data['user_id']).values('id', 'user_id', 'hustler_id', 'notification', 'role_category_id', 'seeker_notification', 'notifica_type', 'status', 'created_at')
+
+    temp_list = []
+    for i in profile:
+        userData = Users.objects.filter(id = i['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
+        hustlerData = Users.objects.filter(id = i['hustler_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
+        temp_dict = {}
+        temp_dict['id'] = i['id']
+        temp_dict['user_id'] = i['user_id']
+        temp_dict['hustler_id'] = i['hustler_id']
+        temp_dict['user_data'] = userData[0]
+        temp_dict['hustler_data'] = hustlerData[0]
+        temp_dict['notification'] = i['notification']
+        temp_dict['seeker_notification'] = i['seeker_notification']
+        temp_dict['notifica_type'] = i['notifica_type']
+        temp_dict['role_category_id'] = i['role_category_id']
+        temp_dict['status'] = i['status']
+        temp_dict['created_at'] = i['created_at'].strftime('%Y-%m-%d %I:%M %p')
+        temp_list.append(temp_dict)
+
+    temp_list2 = []
+    for i2 in profile2:
+        userData2 = Users.objects.filter(id = i2['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
+        hustlerData2 = Users.objects.filter(id = i2['hustler_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
+        temp_dict2 = {}
+        temp_dict2['id'] = i2['id']
+        temp_dict2['user_id'] = i2['user_id']
+        temp_dict2['hustler_id'] = i2['hustler_id']
+        temp_dict2['user_data'] = userData2[0]
+        temp_dict2['notification'] = i2['notification']
+        temp_dict2['seeker_notification'] = i2['seeker_notification']
+        temp_dict2['notifica_type'] = i2['notifica_type']
+        temp_dict2['status'] = i2['status']
+        temp_dict2['created_at'] = i2['created_at'].strftime('%Y-%m-%d %I:%M %p')
+        temp_list2.append(temp_dict2)
+
+    return Response({'status': 200, 'message': 'Notifications', 'hustlers': temp_list2, 'seekers': temp_list})
+
+
+@api_view(['POST'])
+@permission_classes((IsAuthenticated,))
+@authentication_classes([TokenAuthentication])
+@csrf_exempt
+def update_connect_status(request):
+    data = request.data
+
+
+    if Notifications.objects.filter(id=data['notification_id']).exists():
+        noti_obj = Notifications.objects.filter(id = data['notification_id'])[0]
+        noti_obj.status = data['status']
+        noti_obj.save()
+
+        userData = Users.objects.filter(id=noti_obj.user_id).values('device_token').first()
+        hustlerData = Users.objects.filter(id=noti_obj.hustler_id).values('device_token').first()
+
+        url = "https://fcm.googleapis.com/fcm/send"
+        if userData and hustlerData:
+            # Define the data to be sent in the notification
+            dataa = {
+                "to": userData['device_token'],
+                "notification": {
+                    "body": 'Your request is '+data['status'],
+                    "priority": "high",
+                    "title": 'Your request is '+data['status'],
+                    "message_id": data['notification_id'],
+                    "sound": "app_sound.wav",
+                },
+                "data": {
+                    "priority": "high",
+                    "title": 'Your request is '+data['status'],
+                    "body": 'Your request is '+data['status'],
+                    "message_id": data['notification_id'],
+                    "sound": "app_sound.wav",
+                    "content_available": True
+                }
+            }
+
+            # Convert the data dictionary to a JSON string
+            payload = json.dumps(dataa)
+
+            # Define the headers
+            headers = {
+                'Authorization': 'key=AAAAMmfUttw:APA91bFl7CTYHRar2M4KAY_GskDEfApLqawNehtyL7_vjNWsF476TAwT1a3Rf5PNkS2F9D6tTUzC8cShbvRYukWU5STpEkeiiIld0Yd8OnBQLL8heqfYfOeNqjCYJxnh_LNhCwmlx-4P',
+                'Content-Type': 'application/json'
+            }
+
+            # Send the POST request with the payload and headers
+            response = requests.post(url, headers=headers, data=payload)
+        else:
+
+            return Response({'status': 200, 'msg': 'Notification id not correct'})
+
+
+
+        if data['type'] == "connect":
+
+            if data['status'] == 'Accepted':
+                conn_obj = Connect.objects.filter(id = noti_obj.connect_id)[0]
+                conn_obj.status = 'Accepted'
+                conn_obj.save()
+                return Response({'status': 200, 'msg': 'Request Accepted'})
+            else:
+                Notifications.objects.filter(id = data['notification_id']).delete()
+                Connect.objects.filter(id = noti_obj.connect_id).delete()
+                return Response({'status': 200, 'msg': 'Request Rejected'})
+        else:
+
+            if data['status'] == 'Accepted':
+                # conn_obj1 = Appointments.objects.filter(id = noti_obj.connect_id)[0]
+                # conn_obj1.status = 'Accepted'
+                # conn_obj1.save()
+                return Response({'status': 200, 'msg': 'Request Accepted'})
+            else:
+                # Notifications.objects.filter(id = data['notification_id']).delete()
+                # Appointments.objects.filter(id = data['notification_id']).delete()
+                # Connect.objects.filter(id = noti_obj.connect_id).delete()
+                return Response({'status': 200, 'msg': 'Request Rejected'})
+
+
+    else:
+
+        return Response({'status': 400, 'msg': 'Notification id not correct.'})
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
@@ -1024,132 +1201,7 @@ def messages_list(request):
 #         temp_list.append(temp_dict)
 #     return Response({'status': 200, 'message': 'Top Reviews', 'data': temp_list})
 
-# @api_view(['POST'])
-# @permission_classes((IsAuthenticated,))
-# @csrf_exempt
-# def notifications(request):
-#     data = request.data
-#     profile = Notifications.objects.filter(user_id = data['user_id']).values('id', 'user_id', 'hustler_id', 'notification', 'role_category_id', 'seeker_notification', 'notifica_type', 'status', 'created_at')
-#     profile2 = Notifications.objects.filter(hustler_id = data['user_id']).values('id', 'user_id', 'hustler_id', 'notification', 'role_category_id', 'seeker_notification', 'notifica_type', 'status', 'created_at')
 
-#     temp_list = []
-#     for i in profile:
-#         userData = Users.objects.filter(id = i['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
-#         hustlerData = Users.objects.filter(id = i['hustler_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
-#         temp_dict = {}
-#         temp_dict['id'] = i['id']
-#         temp_dict['user_id'] = i['user_id']
-#         temp_dict['hustler_id'] = i['hustler_id']
-#         temp_dict['user_data'] = userData[0]
-#         temp_dict['hustler_data'] = hustlerData[0]
-#         temp_dict['notification'] = i['notification']
-#         temp_dict['seeker_notification'] = i['seeker_notification']
-#         temp_dict['notifica_type'] = i['notifica_type']
-#         temp_dict['role_category_id'] = i['role_category_id']
-#         temp_dict['status'] = i['status']
-#         temp_dict['created_at'] = i['created_at'].strftime('%Y-%m-%d %I:%M %p')
-#         temp_list.append(temp_dict)
-
-#     temp_list2 = []
-#     for i2 in profile2:
-#         userData2 = Users.objects.filter(id = i2['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
-#         hustlerData2 = Users.objects.filter(id = i2['hustler_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'latitude', 'longitude')
-#         temp_dict2 = {}
-#         temp_dict2['id'] = i2['id']
-#         temp_dict2['user_id'] = i2['user_id']
-#         temp_dict2['hustler_id'] = i2['hustler_id']
-#         temp_dict2['user_data'] = userData2[0]
-#         temp_dict2['notification'] = i2['notification']
-#         temp_dict2['seeker_notification'] = i2['seeker_notification']
-#         temp_dict2['notifica_type'] = i2['notifica_type']
-#         temp_dict2['status'] = i2['status']
-#         temp_dict2['created_at'] = i2['created_at'].strftime('%Y-%m-%d %I:%M %p')
-#         temp_list2.append(temp_dict2)
-
-#     return Response({'status': 200, 'message': 'Notifications', 'hustlers': temp_list2, 'seekers': temp_list})
-
-# @api_view(['POST'])
-# @permission_classes((IsAuthenticated,))
-# @csrf_exempt
-# def update_connect_status(request):
-#     data = request.data
-
-
-#     if Notifications.objects.filter(id=data['notification_id']).exists():
-#         noti_obj = Notifications.objects.filter(id = data['notification_id'])[0]
-#         noti_obj.status = data['status']
-#         noti_obj.save()
-
-#         userData = Users.objects.filter(id=noti_obj.user_id).values('device_token').first()
-#         hustlerData = Users.objects.filter(id=noti_obj.hustler_id).values('device_token').first()
-
-#         url = "https://fcm.googleapis.com/fcm/send"
-#         if userData and hustlerData:
-#             # Define the data to be sent in the notification
-#             dataa = {
-#                 "to": userData['device_token'],
-#                 "notification": {
-#                     "body": 'Your request is '+data['status'],
-#                     "priority": "high",
-#                     "title": 'Your request is '+data['status'],
-#                     "message_id": data['notification_id'],
-#                     "sound": "app_sound.wav",
-#                 },
-#                 "data": {
-#                     "priority": "high",
-#                     "title": 'Your request is '+data['status'],
-#                     "body": 'Your request is '+data['status'],
-#                     "message_id": data['notification_id'],
-#                     "sound": "app_sound.wav",
-#                     "content_available": True
-#                 }
-#             }
-
-#             # Convert the data dictionary to a JSON string
-#             payload = json.dumps(dataa)
-
-#             # Define the headers
-#             headers = {
-#                 'Authorization': 'key=AAAAMmfUttw:APA91bFl7CTYHRar2M4KAY_GskDEfApLqawNehtyL7_vjNWsF476TAwT1a3Rf5PNkS2F9D6tTUzC8cShbvRYukWU5STpEkeiiIld0Yd8OnBQLL8heqfYfOeNqjCYJxnh_LNhCwmlx-4P',
-#                 'Content-Type': 'application/json'
-#             }
-
-#             # Send the POST request with the payload and headers
-#             response = requests.post(url, headers=headers, data=payload)
-#         else:
-
-#             return Response({'status': 200, 'msg': 'Notification id not correct'})
-
-
-
-#         if data['type'] == "connect":
-
-#             if data['status'] == 'Accepted':
-#                 conn_obj = Connect.objects.filter(id = noti_obj.connect_id)[0]
-#                 conn_obj.status = 'Accepted'
-#                 conn_obj.save()
-#                 return Response({'status': 200, 'msg': 'Request Accepted'})
-#             else:
-#                 Notifications.objects.filter(id = data['notification_id']).delete()
-#                 Connect.objects.filter(id = noti_obj.connect_id).delete()
-#                 return Response({'status': 200, 'msg': 'Request Rejected'})
-#         else:
-
-#             if data['status'] == 'Accepted':
-#                 conn_obj1 = Appointments.objects.filter(id = noti_obj.connect_id)[0]
-#                 conn_obj1.status = 'Accepted'
-#                 conn_obj1.save()
-#                 return Response({'status': 200, 'msg': 'Request Accepted'})
-#             else:
-#                 # Notifications.objects.filter(id = data['notification_id']).delete()
-#                 # Appointments.objects.filter(id = data['notification_id']).delete()
-#                 # Connect.objects.filter(id = noti_obj.connect_id).delete()
-#                 return Response({'status': 200, 'msg': 'Request Rejected'})
-
-
-#     else:
-
-#         return Response({'status': 400, 'msg': 'Notification id not correct.'})
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
@@ -1323,43 +1375,6 @@ def messages_list(request):
 
 # @api_view(['POST'])
 
-# def send_notification(request):
-#     url = "https://fcm.googleapis.com/fcm/send"
-
-#     # Define the data to be sent in the notification
-#     data = {
-#         "to": "fW-Ubcj2TbKmfMy-GFeqIE:APA91bHmzVqYLHelGQHtTC_4iHrRlUxkqOe3YYU0vp_Xlm4UQS5VO26Fi_lAWrFpgj7zVIfPvnxk7o4LnX7tkYeuBmt833UaEkPBpxXLBWWRPePWfP5FcFi3ExeSgNyZa-LjbbFGC-md",
-#         "notification": {
-#             "body": "New announcement assigned",
-#             "priority": "high",
-#             "message_id": '1',
-#             "title": "hello",
-#             "sound": "app_sound.wav",
-#         },
-#         "data": {
-#             "priority": "high",
-#             "message_id": '1',
-#             "title": "hello",
-#             "body": "New announcement assignedaaaa",
-#             "sound": "app_sound.wav",
-#             "content_available": True
-#         }
-#     }
-
-#     # Convert the data dictionary to a JSON string
-#     payload = json.dumps(data)
-
-#     # Define the headers
-#     headers = {
-#         'Authorization': 'key=AAAAMmfUttw:APA91bFl7CTYHRar2M4KAY_GskDEfApLqawNehtyL7_vjNWsF476TAwT1a3Rf5PNkS2F9D6tTUzC8cShbvRYukWU5STpEkeiiIld0Yd8OnBQLL8heqfYfOeNqjCYJxnh_LNhCwmlx-4P',
-#         'Content-Type': 'application/json'
-#     }
-
-#     # Send the POST request with the payload and headers
-#     response = requests.post(url, headers=headers, data=payload)
-
-#     # Return the response
-#     return Response({'status':200,'msg':'sent'})
 
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
