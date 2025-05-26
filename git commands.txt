@@ -5,7 +5,7 @@ git init
 git add .
 
 # 3. Commit your code
-git commit -m "chat updated"
+git commit -m "notification added"
 
 # 4. Add your Git remote (replace URL with your Git server repo)
 git remote add origin https://github.com/Venkatesh1-pi/HustlerandSeekers.git
@@ -51,4 +51,9 @@ sudo systemctl enable daphne
 sudo journalctl -u gunicorn.service -f
 sudo tail -f /var/log/nginx/error.log
 daphne hustler.asgi:application
+
+sqlite3 db.sqlite3
+.tables
+.exit
+
 

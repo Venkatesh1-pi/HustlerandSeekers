@@ -313,17 +313,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
             response = requests.post(url, headers=headers, data=json.dumps(fcm_data))
             print(f"FCM status: {response.status_code}, response: {response.text}")
 
-            # Save Notification
-            Notifications.objects.create(
-                connect_id=str(chat.id),
-                user_id=str(data['receiver_id']),
-                hustler_id=str(data['sender_id']),
-                role_category_id=str(data['category_id']),
-                notification=f"{senderData['username']} sent a message",
-                seeker_notification=data['message'],
-                notifica_type="chat",
-                status='0'
-            )
+           
+
+            notifications = Notifications()
+            notifications.user_id = data['receiver_id']
+            notifications.connect_id = str(chat.id)
+            notifications.hustler_id = str(data['sender_id'])  # no comma here
+            notifications.notification = f"{senderData['username']} sent a message"  # no comma here
+            notifications.role_category_id = str(data['category_id'])  # no comma here
+            notifications.seeker_notification = data['message']  # no comma here
+            notifications.notifica_type = 'chat'
+            notifications.status = '0'
+            notifications.save()
+
+
+
         except Exception as e:
             print(f"Notification error: {e}")
 
