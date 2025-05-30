@@ -41,6 +41,14 @@ import subprocess
 
 
 import math
+import firebase_admin
+from firebase_admin import credentials, messaging
+
+# Path to your Firebase service account key
+cred = credentials.Certificate("hustler_role_category/hustlersandseekers.json")
+
+# Initialize the Firebase Admin app
+firebase_admin.initialize_app(cred)
 
 # def haversine(lat1, lon1, lat2, lon2):
 #     """
@@ -622,18 +630,53 @@ def connect(request):
     if Connect.objects.filter(user_id=data['user_id'], role_category_id=data['role_category_id'], hustler_id=data['hustler_id']).exists():
         return Response({'status': 400, 'msg': 'Already requested'}, status=400)
 
-    connect = Connect(
-        user_id=data['user_id'],
-        role_category_id=data['role_category_id'],
-        hustler_id=data['hustler_id'],
-        status='pending'
-    )
-    connect.save()
+    else:
+        userData = Users.objects.filter(id = data['user_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'device_token', 'latitude', 'longitude')
+        hustlerData = Users.objects.filter(id = data['hustler_id']).values('id', 'username', 'email', 'phone', 'image', 'gender', 'dob', 'first_name', 'last_name', 'location', 'banner_image', 'device_token', 'latitude', 'longitude')
+        userDataa = userData[0]
+        hustlerDataa = hustlerData[0]
+        connect.user_id = data['user_id']
+        connect.role_category_id = data['role_category_id']
+        connect.hustler_id = data['hustler_id']
+        connect.status = 'pending'
+        connect.save()
 
-    # Send notification & save in Notifications
-    # (Omitted for brevity, same logic as above)
+        notification_message = userDataa['username'] + ' wants to connect with you, check the message sent you.'
+        seeker_notification_message = 'You wants to connect with '+hustlerDataa['username']+', check the message you sent.'
 
-    return Response({'status': 200, 'msg': 'Connection request sent.'})
+        message = messaging.Message(
+                    token=hustlerDataa['device_token'],
+                    notification=messaging.Notification(
+                        title=f"{userDataa['username']} sent a connection request",
+                        body=notification_message
+                    ),
+                    data={
+                        "priority": "high",
+                        "title": f"{userDataa['username']} sent a connection request",
+                        "body": notification_message,
+                        "message_id": connect['id'],
+                        "sound": "app_sound.wav",
+                        "content_available": "true"  # Must be a string
+                    }
+                )
+
+        # Send the message
+        response = messaging.send(message)
+        
+        notifications = Notifications()
+        notifications.user_id = data['user_id']
+        notifications.connect_id = connect.id
+        notifications.hustler_id = data['hustler_id']
+        notifications.notification = notification_message
+        notifications.role_category_id = data['role_category_id']
+        notifications.seeker_notification = seeker_notification_message
+        notifications.notifica_type = 'connect'
+        notifications.status = 'Pending'
+        notifications.save()
+        return Response({'status': 200, 'msg': 'Connection request sent.'})
+    
+
+
 
 
 @api_view(['POST'])
@@ -896,7 +939,7 @@ def send_notification(request):
 
     # Define the headers
     headers = {
-        'Authorization': 'key=AAAAMmfUttw:APA91bFl7CTYHRar2M4KAY_GskDEfApLqawNehtyL7_vjNWsF476TAwT1a3Rf5PNkS2F9D6tTUzC8cShbvRYukWU5STpEkeiiIld0Yd8OnBQLL8heqfYfOeNqjCYJxnh_LNhCwmlx-4P',
+        'Authorization': 'key=AAAAMmfUttw:APA91bEicOCYgsYiYAyA3frA-h9piGaMho_2eiKfu8DAHaWRlqC-UaIDIhOD_C2ucQgFp-MDWLpIdBSAm01UgvE0YQpE_P6dKQSA-LKpIOAJPsSb5tcuccXokECi0afnuqnjICHI7Yn9',
         'Content-Type': 'application/json'
     }
 
@@ -969,40 +1012,28 @@ def update_connect_status(request):
 
         userData = Users.objects.filter(id=noti_obj.user_id).values('device_token').first()
         hustlerData = Users.objects.filter(id=noti_obj.hustler_id).values('device_token').first()
-
         url = "https://fcm.googleapis.com/fcm/send"
         if userData and hustlerData:
-            # Define the data to be sent in the notification
-            dataa = {
-                "to": userData['device_token'],
-                "notification": {
-                    "body": 'Your request is '+data['status'],
-                    "priority": "high",
-                    "title": 'Your request is '+data['status'],
-                    "message_id": data['notification_id'],
-                    "sound": "app_sound.wav",
+           # Create the message
+            message = messaging.Message(
+                token=userData['device_token'],
+                notification=messaging.Notification(
+                    title='Your request is ' + data['status'],
+                    body='Your request is ' + data['status'],
+                ),
+                data={
+                    'priority': 'high',
+                    'title': 'Your request is ' + data['status'],
+                    'body': 'Your request is ' + data['status'],
+                    'message_id': data['notification_id'],
+                    'sound': 'app_sound.wav',
+                    'content_available': 'true',
                 },
-                "data": {
-                    "priority": "high",
-                    "title": 'Your request is '+data['status'],
-                    "body": 'Your request is '+data['status'],
-                    "message_id": data['notification_id'],
-                    "sound": "app_sound.wav",
-                    "content_available": True
-                }
-            }
+            )
 
-            # Convert the data dictionary to a JSON string
-            payload = json.dumps(dataa)
-
-            # Define the headers
-            headers = {
-                'Authorization': 'key=AAAAMmfUttw:APA91bFl7CTYHRar2M4KAY_GskDEfApLqawNehtyL7_vjNWsF476TAwT1a3Rf5PNkS2F9D6tTUzC8cShbvRYukWU5STpEkeiiIld0Yd8OnBQLL8heqfYfOeNqjCYJxnh_LNhCwmlx-4P',
-                'Content-Type': 'application/json'
-            }
-
-            # Send the POST request with the payload and headers
-            response = requests.post(url, headers=headers, data=payload)
+            # Send the message
+            response = messaging.send(message)
+            print("✅ Successfully sent message:", response)
         else:
 
             return Response({'status': 200, 'msg': 'Notification id not correct'})
