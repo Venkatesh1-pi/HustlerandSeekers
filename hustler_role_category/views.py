@@ -48,7 +48,8 @@ from firebase_admin import credentials, messaging
 cred = credentials.Certificate("hustler_role_category/hustlersandseekers.json")
 
 # Initialize the Firebase Admin app
-firebase_admin.initialize_app(cred)
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(cred)
 
 # def haversine(lat1, lon1, lat2, lon2):
 #     """
@@ -537,23 +538,22 @@ def top_profiles(request):
         return Response({'status': 400, 'message': 'Invalid or missing latitude/longitude'})
     if search_role:
         profiles = UsersCategory.objects.filter(
-                role_category_name__icontains=search_role  # Filters based on partial match for 'role_category_name'
-            ).values(
-                'id', 'user_id', 'role_category_name', 'summary', 'about_yourself',
-                'price', 'latitude', 'longitude', 'image1', 'image2', 'image3', 'video',
-                'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link',
-                'yt_link', 'other_link', 'is_primary'
-            )
+            Q(role_category_name__icontains=search_role) & ~Q(user_id=data['user_id'])
+        ).values(
+            'id', 'user_id', 'role_category_name', 'summary', 'about_yourself',
+            'price', 'latitude', 'longitude', 'image1', 'image2', 'image3', 'video',
+            'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link',
+            'yt_link', 'other_link', 'is_primary'
+        )
     else:
         profiles = UsersCategory.objects.filter(
-                ~Q(user_id=data['user_id'])
-            ).values(
-                'id', 'user_id', 'role_category_name', 'summary', 'about_yourself',
-                'price', 'latitude', 'longitude', 'image1', 'image2', 'image3', 'video',
-                'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link',
-                'yt_link', 'other_link', 'is_primary'
-            )
-
+            ~Q(user_id=data['user_id'])
+        ).values(
+            'id', 'user_id', 'role_category_name', 'summary', 'about_yourself',
+            'price', 'latitude', 'longitude', 'image1', 'image2', 'image3', 'video',
+            'twitter_link', 'isnta_link', 'fb_link', 'linkedin_link',
+            'yt_link', 'other_link', 'is_primary'
+        )
     temp_list = []
 
     for profile in profiles:
@@ -1067,8 +1067,54 @@ def update_connect_status(request):
 
     else:
 
-        return Response({'status': 400, 'msg': 'Notification id not correct.'})
+        return  Response({'status': 400, 'msg': 'Notification id not correct.'})
 
+from serpapi import GoogleSearch
+
+
+from serpapi import GoogleSearch
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([TokenAuthentication])
+def youtube_shorts_search(request):
+    data = request.data
+    query = data.get('query')
+
+    if not query:
+        return JsonResponse({"error": "Missing search query parameter."}, status=400)
+
+    params = {
+        "engine": "youtube",
+        "search_query": query,
+        "api_key": "0958fdb5c7fdb651a8c42f32aa3530a07ff7c566a991f9b164368e3a0f061434"
+    }
+
+    try:
+        search = GoogleSearch(params)
+        results = search.get_dict()
+
+        video_results = results.get("video_results", [])
+
+        shorts_results = results.get("shorts_results", [])
+        all_shorts = []
+        for section in shorts_results:
+            all_shorts.extend(section.get("shorts", []))
+
+        channels_new_to_you = results.get("channels_new_to_you", [])
+        people_also_search_for = results.get("people_also_search_for", {}).get("searches", [])
+        from_related_searches = results.get("from_related_searches", [])
+
+        return JsonResponse({
+            "video_results": video_results,
+            "shorts_results": all_shorts,
+            "channels_new_to_you": channels_new_to_you,
+            "people_also_search_for": people_also_search_for,
+            "from_related_searches": from_related_searches
+        }, status=200)
+
+    except Exception as e:
+        return JsonResponse({"error": f"Internal Server Error: {str(e)}"}, status=500)
 # @api_view(['POST'])
 # @permission_classes((IsAuthenticated,))
 # @csrf_exempt

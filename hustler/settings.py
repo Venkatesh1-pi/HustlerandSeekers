@@ -120,14 +120,13 @@ DEBUG = True
 
 # ALLOWED_HOSTS = ['https://hustlersandseekers.co/','hustlersandseekers.co', 'https://staging.hustlersandseekers.co/', 'staging.hustlersandseekers.co']
 
- #ALLOWED_HOSTS = [
-#     '82.25.86.49',  # Your public IP
-#     '127.0.0.1',    # Localhost (needed for Daphne proxy)
-#     'localhost',
-#     # add any other domains you use here
-# ]
+ALLOWED_HOSTS = [
+     '82.25.86.49',  # Your public IP
+     '127.0.0.1',    # Localhost (needed for Daphne proxy)
+     'localhost',     # add any other domains you use here
+ ]
 #ALLOWED_HOSTS = []
-ALLOWED_HOSTS = ["*"]
+#ALLOWED_HOSTS = ["*"]
 
 
 # Channels origin whitelist (optional, Channels 3+)

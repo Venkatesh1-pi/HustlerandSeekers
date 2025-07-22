@@ -19,7 +19,9 @@ from firebase_admin import credentials, messaging
 cred = credentials.Certificate("hustler_role_category/hustlersandseekers.json")
 
 # Initialize the Firebase Admin app
-firebase_admin.initialize_app(cred)
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(cred)
+
 
 User = get_user_model()
 base_url = "http://82.25.86.49"
@@ -104,7 +106,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.send(json.dumps({
                 "type": "error",
                 "error_code": 500,
-                "error": "Internal server error"
+                "error": "Internal server error"+str(e)
             }))
 
     async def chat_message(self, event):
@@ -162,36 +164,48 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Send FCM push notification to receiver if device_token exists
         try:
             receiver_user = Users.objects.get(id=chat.receiver_id)
-            device_token = getattr(receiver_user, 'device_token', None)  # Adjust field name if different
-            if device_token:
-                attachment_url = f"{base_url}{settings.MEDIA_URL}{chat['attachment']}" if chat['attachment'] else ""
-
-                # Construct the message
-                message = messaging.Message(
-                    token=device_token,
-                    notification=messaging.Notification(
-                        title="New Chat Message",
-                        body=chat['message'],
-                    ),
-                    data={
-                        "chat_id": chat['id'],
-                        "sender_id": chat['sender_id'],
-                        "receiver_id": chat['receiver_id'],
-                        "message": chat['message'],
-                        "attachment_url": attachment_url,
-                        "content_available": "true",  # Must be string in FCM
-                        "priority": "high",
-                        "sound": "default"
-                    }
-                )
-
-                # Send the message
-                response = messaging.send(message)
-
         except Users.DoesNotExist:
-            print("Receiver user not found for FCM.")
-        except Exception as fcm_error:
-            print("FCM notification failed:", fcm_error)
+            print(f"[ERROR] Receiver user with ID {chat.receiver_id} not found.")
+            return chat  # or handle accordingly
+
+        sender_qs = Users.objects.filter(id=chat.sender_id).values('id', 'username', 'device_token')
+        if not sender_qs.exists():
+            print(f"[ERROR] Sender user with ID {chat.sender_id} not found.")
+            return chat  # or handle accordingly
+
+        sender_user = sender_qs[0]
+        device_token = getattr(receiver_user, 'device_token', None)
+
+        if device_token:
+            attachment_url = f"{base_url}{settings.MEDIA_URL}{chat.attachment}" if chat.attachment else ""
+
+            # Construct the FCM message
+            message = messaging.Message(
+                token=device_token,
+                notification=messaging.Notification(
+                    title=f"{sender_user['username']} sent a message",
+                    body=str(chat.message),
+                ),
+                data={
+                    "chat_id": str(chat.id),
+                    "sender_id": str(chat.sender_id),
+                    "receiver_id": str(chat.receiver_id),
+                    "message": str(chat.message),
+                    "attachment_url": attachment_url,
+                    "content_available": "true",  # Must be string
+                    "priority": "high",
+                    "sound": "default"
+                }
+            )
+
+            try:
+                response = messaging.send(message)
+                print(f"[FCM] Message sent successfully: {response}")
+            except Exception as e:
+                print(f"[FCM ERROR] Failed to send message: {e}")
+
+
+            
 
         return chat
 
